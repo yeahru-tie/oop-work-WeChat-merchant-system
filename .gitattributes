@@ -1,0 +1,12 @@
+# Normalize text line endings across platforms.
+* text=auto
+*.md text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Office documents and images must remain byte-for-byte binary files.
+*.docx binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
