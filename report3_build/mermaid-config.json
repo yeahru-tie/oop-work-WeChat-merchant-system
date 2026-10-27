@@ -1,0 +1,13 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Microsoft YaHei, SimHei, sans-serif",
+    "fontSize": "18px",
+    "primaryColor": "#eef3fb",
+    "primaryBorderColor": "#4a6fa5",
+    "primaryTextColor": "#1a1a1a",
+    "lineColor": "#4a6fa5"
+  },
+  "flowchart": { "htmlLabels": true, "curve": "basis", "nodeSpacing": 36, "rankSpacing": 40 },
+  "sequence": { "width": 180, "height": 46, "boxMargin": 10 }
+}

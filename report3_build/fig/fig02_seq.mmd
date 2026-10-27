@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant C as 客户端
+    participant S as 服务端
+    participant DB as 数据库
+    C->>S: 10040000 提交结算 seq=n
+    S->>S: 解析报文 · 校验功能码与数据体
+    S->>DB: 事务内逐条条件更新扣减库存
+    DB-->>S: 影响行数
+    alt 库存充足
+        S->>DB: 写入订单与订单明细
+        S->>S: 发布交易完成事件
+        S-->>C: 20040000 结算成功 · 含计算明细 seq=n
+    else 库存不足
+        S->>DB: 回滚事务
+        S-->>C: 20040000 业务失败 · 库存不足 seq=n
+    end
+    S-->>C: 90010000 推送 · 订单状态变更
