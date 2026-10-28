@@ -25,3 +25,16 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+# Repository-local JDK, Maven, downloads and dependency cache
+/.tools/
+
+# Maven build outputs
+**/target/
+
+# Runtime SQLite data (schema and demo sources stay in server resources)
+/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

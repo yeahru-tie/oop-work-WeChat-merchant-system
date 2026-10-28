@@ -1,0 +1,5 @@
+[
+  {"productId":1001,"name":"演示笔记本","priceCents":1290,"stock":20,"description":"仅用于课程演示的商品资料，可在后续替换。"},
+  {"productId":1002,"name":"演示水杯","priceCents":2590,"stock":15,"description":"仅用于课程演示的商品资料，可在后续替换。"},
+  {"productId":1003,"name":"演示帆布袋","priceCents":3990,"stock":8,"description":"仅用于课程演示的商品资料，可在后续替换。"}
+]

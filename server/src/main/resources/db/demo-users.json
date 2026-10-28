@@ -1,0 +1,23 @@
+[
+  {
+    "userId": 1,
+    "username": "buyer_a",
+    "displayName": "演示买家 A",
+    "passwordHash": "pbkdf2-sha256$600000$xBBFDly3wbVgN60Io0HXug==$kTvKmbi6EYduZpSGK1QHxSFRiTDe72DlfHm+67qyzPA=",
+    "role": "BUYER"
+  },
+  {
+    "userId": 2,
+    "username": "buyer_b",
+    "displayName": "演示买家 B",
+    "passwordHash": "pbkdf2-sha256$600000$HlK6UhfIK4fY+KSFumGbqg==$lx4pID4m23KJ6iwte5hRuUeBxvrSjaAtxaCblzclw7E=",
+    "role": "BUYER"
+  },
+  {
+    "userId": 3,
+    "username": "shop_admin",
+    "displayName": "店铺管理员",
+    "passwordHash": "pbkdf2-sha256$600000$bI2JbqN9fapQI5khO59eLQ==$Ku8Gz1FQ8zM2MCVhJuIGR0j+AyVTPHeK9uKG2ccVooI=",
+    "role": "ADMIN"
+  }
+]

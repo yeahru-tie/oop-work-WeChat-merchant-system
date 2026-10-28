@@ -1,0 +1,4 @@
+CREATE TABLE carts (
+    user_id INTEGER PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    version INTEGER NOT NULL DEFAULT 0 CHECK (version >= 0)
+) STRICT;
