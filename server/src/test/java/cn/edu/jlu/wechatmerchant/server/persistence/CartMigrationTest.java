@@ -14,7 +14,7 @@ class CartMigrationTest {
     private SqliteDatabase v2(String name) throws Exception {
         var database=new SqliteDatabase(directory.resolve(name)); database.initialize();
         try (var c=database.openWriteConnection(); var s=c.createStatement()) {
-            s.execute("DROP TABLE checkout_attempts");s.execute("DROP TABLE order_items");s.execute("DROP TABLE orders");s.execute("DROP TABLE user_coupons"); s.execute("DROP TABLE coupon_campaigns"); s.execute("DROP TABLE promotions"); s.execute("DROP TABLE cart_items"); s.execute("DROP TABLE carts"); s.execute("PRAGMA user_version=2");
+            s.execute("DROP TABLE message_reads");s.execute("DROP TABLE notifications");s.execute("DROP TABLE refunds");s.execute("DROP TABLE return_attempts");s.execute("DROP TABLE after_sales");s.execute("DROP TABLE checkout_attempts");s.execute("DROP TABLE order_items");s.execute("DROP TABLE orders");s.execute("DROP TABLE user_coupons"); s.execute("DROP TABLE coupon_campaigns"); s.execute("DROP TABLE promotions"); s.execute("DROP TABLE cart_items"); s.execute("DROP TABLE carts"); s.execute("PRAGMA user_version=2");
             s.executeUpdate("UPDATE users SET enabled=0 WHERE user_id=1");
             s.executeUpdate("DELETE FROM users WHERE user_id=2");
             s.executeUpdate("UPDATE products SET stock=7,name='实际商品' WHERE product_id=1001");

@@ -15,7 +15,7 @@ class PromotionMigrationTest {
         var db=new SqliteDatabase(directory.resolve("原始 购物库.db")); db.initialize();
         new CartService(db).add(1,1001,2,0);
         try(var c=db.openWriteConnection(); var s=c.createStatement()) {
-            s.execute("DROP TABLE checkout_attempts");s.execute("DROP TABLE order_items");s.execute("DROP TABLE orders");s.execute("DROP TABLE user_coupons"); s.execute("DROP TABLE coupon_campaigns"); s.execute("DROP TABLE promotions"); s.execute("PRAGMA user_version=3");
+            s.execute("DROP TABLE message_reads");s.execute("DROP TABLE notifications");s.execute("DROP TABLE refunds");s.execute("DROP TABLE return_attempts");s.execute("DROP TABLE after_sales");s.execute("DROP TABLE checkout_attempts");s.execute("DROP TABLE order_items");s.execute("DROP TABLE orders");s.execute("DROP TABLE user_coupons"); s.execute("DROP TABLE coupon_campaigns"); s.execute("DROP TABLE promotions"); s.execute("PRAGMA user_version=3");
             s.executeUpdate("UPDATE users SET enabled=0 WHERE user_id=2");
             s.executeUpdate("UPDATE products SET price_cents=777 WHERE product_id=1001");
         }

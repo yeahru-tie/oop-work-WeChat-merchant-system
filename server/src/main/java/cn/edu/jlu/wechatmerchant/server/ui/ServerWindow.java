@@ -16,7 +16,7 @@ import java.awt.FlowLayout;
 
 public final class ServerWindow extends JFrame {
     private static final long serialVersionUID = 1L;
-    private final JTabbedPane navigation = new JTabbedPane();
+    private final cn.edu.jlu.wechatmerchant.desktop.NavigationPane navigation = new cn.edu.jlu.wechatmerchant.desktop.NavigationPane("店铺管理");
     private final JButton logout = new JButton("退出管理身份");
 
     public ServerWindow(String status, UserIdentity administrator) {
@@ -24,27 +24,22 @@ public final class ServerWindow extends JFrame {
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         setMinimumSize(new Dimension(640, 420));
 
-        JPanel content = new JPanel(new BorderLayout(0, 18));
-        content.setBorder(BorderFactory.createEmptyBorder(20, 24, 16, 24));
-
-        JLabel heading = new JLabel("店铺管理");
-        heading.setFont(heading.getFont().deriveFont(Font.BOLD, 24f));
-        content.add(heading, BorderLayout.NORTH);
-
-        navigation.addTab("运行状态", unavailablePage(status));
-        navigation.addTab("交易与售后", unavailablePage("交易查询与售后受理功能尚未开放。"));
-        navigation.addTab("优惠公告", unavailablePage("优惠公告发布功能尚未开放。"));
-        content.add(navigation, BorderLayout.CENTER);
-        JPanel identityBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
-        JLabel identity = new JLabel();
-        identity.putClientProperty("html.disable", Boolean.TRUE);
-        identity.setText("管理员：" + administrator.displayName());
-        identityBar.add(identity);
-        identityBar.add(logout);
-        content.add(identityBar, BorderLayout.SOUTH);
-
-        setContentPane(content);
-        setSize(780, 500);
+        var runtime=new cn.edu.jlu.wechatmerchant.desktop.SurfacePanel(new BorderLayout(0,24));
+        runtime.add(cn.edu.jlu.wechatmerchant.desktop.Ui.title("服务已就绪"),BorderLayout.NORTH);
+        var ready=new cn.edu.jlu.wechatmerchant.desktop.StatusPill("运行中",cn.edu.jlu.wechatmerchant.desktop.StatusPill.Tone.SUCCESS);
+        runtime.add(cn.edu.jlu.wechatmerchant.desktop.Ui.row(ready),BorderLayout.CENTER);
+        var details=cn.edu.jlu.wechatmerchant.desktop.Ui.text(status,2);runtime.add(details,BorderLayout.SOUTH);
+        var runtimePage=new JPanel(new BorderLayout());runtimePage.add(runtime,BorderLayout.NORTH);
+        navigation.addTab("运行状态",runtimePage);
+        navigation.addTab("交易与售后",unavailablePage("暂无交易"));
+        navigation.addTab("优惠公告",unavailablePage("暂无公告"));
+        navigation.addTab("显示设置",new cn.edu.jlu.wechatmerchant.desktop.ThemeSettingsPanel());
+        navigation.accountArea().add(cn.edu.jlu.wechatmerchant.desktop.Ui.label(administrator.displayName()));
+        logout.setText("退出登录");logout.putClientProperty("theme.ghost",true);navigation.accountArea().add(logout);
+        setContentPane(navigation);
+        var screen=java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+        setMinimumSize(new Dimension(Math.min(1020,screen.width-32),Math.min(700,screen.height-32)));
+        setSize(Math.min(1320,screen.width-40),Math.min(880,screen.height-40));
         setLocationRelativeTo(null);
     }
 
@@ -54,14 +49,14 @@ public final class ServerWindow extends JFrame {
 
     public void installPromotions(PromotionManagementPanel panel) {
         navigation.insertTab("促销管理",null,panel,"维护商品直降与折扣",1);
-        setMinimumSize(new Dimension(860,660));
-        setSize(980,740);
-        setLocationRelativeTo(null);
+
     }
 
     public void installCoupons(CouponManagementPanel panel) {
         navigation.insertTab("优惠券管理",null,panel,"草稿、发布及暂停领取",Math.min(2,navigation.getTabCount()));
     }
+    public void installAfterSales(AfterSaleManagementPanel panel){for(int i=0;i<navigation.getTabCount();i++)if(navigation.getTitleAt(i).equals("交易与售后")){navigation.setComponentAt(i,panel);return;}throw new IllegalStateException("Missing management tab.");}
+    public void installAnnouncements(AnnouncementPanel panel){for(int i=0;i<navigation.getTabCount();i++)if(navigation.getTitleAt(i).equals("优惠公告")){navigation.setComponentAt(i,panel);return;}throw new IllegalStateException("Missing announcement tab.");}
 
     private static String authorizedTitle(UserIdentity administrator) {
         if (administrator == null || administrator.role() != UserIdentity.Role.ADMIN) {

@@ -10,7 +10,7 @@ import java.nio.file.*;
 import java.util.*;
 
 /** Only public owner identifiers and frozen request parameters; never passwords or session tokens. */
-public final class PendingCheckouts {
+public final class PendingCheckouts implements CheckoutJournal {
     public record Entry(CheckoutRequest request,List<Long> knownItems){public Entry{Objects.requireNonNull(request);knownItems=CartSelection.validate(knownItems);if(!knownItems.containsAll(request.itemIds()))throw new IllegalArgumentException("Missing checkout context.");}}
     private static final Gson GSON=new GsonBuilder().serializeNulls().setStrictness(Strictness.STRICT).create();
     private final Path root;

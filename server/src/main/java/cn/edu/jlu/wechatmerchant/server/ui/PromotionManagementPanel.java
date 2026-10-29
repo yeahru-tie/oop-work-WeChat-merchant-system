@@ -6,6 +6,8 @@ import cn.edu.jlu.wechatmerchant.server.application.PromotionPreviewService;
 import cn.edu.jlu.wechatmerchant.server.domain.Product;
 import cn.edu.jlu.wechatmerchant.server.domain.promotion.*;
 import java.awt.BorderLayout;
+import java.awt.Dimension;
+import cn.edu.jlu.wechatmerchant.desktop.*;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.math.BigDecimal;
@@ -36,43 +38,17 @@ public final class PromotionManagementPanel extends JPanel implements AutoClosea
 
     public PromotionManagementPanel(PromotionManagementService service, Supplier<String> token, Runnable unauthorized) {
         super(new BorderLayout(10,10));
-        setBorder(BorderFactory.createEmptyBorder(12,12,12,12));
-        controller=new PromotionManagementController(service,token,this::showStatus,unauthorized);
-        JPanel top=new JPanel(new BorderLayout(8,8));
-        products.setName("promotion-products");
-        products.setPreferredSize(new java.awt.Dimension(360,28));
-        products.setRenderer((list,value,index,selected,focus) -> {
-            JLabel label=new JLabel(value==null ? "请选择商品" : value.productId()+" · "+value.name());
-            label.putClientProperty("html.disable",Boolean.TRUE);
-            label.setOpaque(true);
-            label.setBackground(selected?list.getSelectionBackground():list.getBackground());
-            label.setForeground(selected?list.getSelectionForeground():list.getForeground());
-            return label;
-        });
-        top.add(products,BorderLayout.CENTER);
-        JPanel pages=new JPanel(new FlowLayout(FlowLayout.RIGHT,6,0));
-        pages.add(previous); pages.add(next); pages.add(reload); top.add(pages,BorderLayout.EAST);
-        add(top,BorderLayout.NORTH);
-        JPanel body=new JPanel(new BorderLayout(0,8));
-        JPanel fields=new JPanel(new GridLayout(0,2,12,6));
-        fields.add(new JLabel("当前商品价格 / 库存")); fields.add(price);
-        field(fields,"每件直降（元，0 表示不直降）",reduction,"promotion-reduction");
-        field(fields,"统一折扣（>0 至10折）",discount,"promotion-discount");
-        field(fields,"开始（北京时间，年-月-日 时:分:秒）",start,"promotion-start");
-        field(fields,"结束（到达此刻即失效）",end,"promotion-end");
-        fields.add(new JLabel("启停状态")); fields.add(enabled); enabled.setName("promotion-enabled");
-        fields.add(new JLabel("试算数量（不占库存）")); fields.add(quantity); quantity.setName("promotion-quantity");
-        fields.add(new JLabel("已保存状态")); fields.add(saved);
-        body.add(fields,BorderLayout.NORTH);
-        result.setEditable(false); result.setLineWrap(true); result.setWrapStyleWord(true);
-        result.setName("promotion-preview-result");
-        body.add(new JScrollPane(result),BorderLayout.CENTER);
-        add(body,BorderLayout.CENTER);
-        JPanel bottom=new JPanel(new BorderLayout(0,8));
-        status.putClientProperty("html.disable",Boolean.TRUE); bottom.add(status,BorderLayout.NORTH);
-        JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        preview.setName("promotion-preview"); save.setName("promotion-save"); reload.setName("promotion-reload");
-        actions.add(preview); actions.add(save); bottom.add(actions,BorderLayout.SOUTH); add(bottom,BorderLayout.SOUTH);
+        setOpaque(false);controller=new PromotionManagementController(service,token,this::showStatus,unauthorized);
+        products.setName("promotion-products");products.setPreferredSize(new Dimension(360,42));products.setRenderer((list,value,index,chosen,focus) -> {var label=Ui.label(value==null?"选择商品":value.name());label.setOpaque(true);label.setBackground(chosen?list.getSelectionBackground():list.getBackground());label.setForeground(chosen?list.getSelectionForeground():list.getForeground());label.setBorder(BorderFactory.createEmptyBorder(index<0?0:8,10,index<0?0:8,10));return label;});
+        reload.setText("刷新");var top=new JPanel(new BorderLayout(24,0));top.setOpaque(false);top.add(products,BorderLayout.CENTER);top.add(Ui.row(previous,next,reload),BorderLayout.EAST);add(top,BorderLayout.NORTH);
+        var form=new SurfacePanel(new BorderLayout(0,24));form.add(Ui.row(Ui.title("活动设置"),Ui.help("先直降再折扣，逐件四舍五入到分。时间按北京时间，开始包含、结束不包含。点击保存后生效。")),BorderLayout.NORTH);
+        var fields=new JPanel(new GridLayout(0,2,24,24));fields.setOpaque(false);field(fields,"直降 / 元",reduction,"promotion-reduction");field(fields,"折扣 / 折",discount,"promotion-discount");field(fields,"开始时间",start,"promotion-start");field(fields,"结束时间",end,"promotion-end");
+        enabled.setText("启用活动");enabled.setName("promotion-enabled");form.add(Ui.stack(24,price,fields,Ui.row(enabled,saved)),BorderLayout.CENTER);
+        preview.setText("预览");save.setText("保存");preview.setName("promotion-preview");save.setName("promotion-save");reload.setName("promotion-reload");Theme.primary(save);form.add(Ui.row(save),BorderLayout.SOUTH);
+        var previewCard=new SurfacePanel(new BorderLayout(0,24));previewCard.setPreferredSize(new Dimension(300,400));previewCard.add(Ui.row(Ui.title("效果预览"),new StatusPill("仅试算",StatusPill.Tone.NEUTRAL)),BorderLayout.NORTH);
+        quantity.setName("promotion-quantity");quantity.setPreferredSize(new Dimension(132,42));result.setEditable(false);result.setLineWrap(true);result.setWrapStyleWord(true);result.setOpaque(false);result.setFont(new JLabel().getFont().deriveFont(16f));result.setName("promotion-preview-result");previewCard.add(Ui.stack(24,Ui.field("数量",quantity,null),preview,Ui.scroll(result)),BorderLayout.CENTER);
+        var body=new JPanel(new BorderLayout(24,24));body.setOpaque(false);body.add(form,BorderLayout.CENTER);body.add(previewCard,BorderLayout.EAST);add(body,BorderLayout.CENTER);
+        status.putClientProperty("html.disable",true);add(status,BorderLayout.SOUTH);
         products.addActionListener(event -> { if (!filling && !busy) loadSelected(); });
         previous.addActionListener(event -> loadPage(Math.max(0,offset-20)));
         next.addActionListener(event -> loadPage(offset+20));
@@ -117,7 +93,7 @@ public final class PromotionManagementPanel extends JPanel implements AutoClosea
         end.setText(TIME.format(configuration==null ? now.plusDays(7) : LocalDateTime.ofInstant(configuration.endsAt(),ZONE)));
         enabled.setSelected(configuration!=null && configuration.enabled());
         price.setText("¥ "+BigDecimal.valueOf(value.product().priceCents(),2)+" / "+value.product().stock()+" 件");
-        saved.setText(configuration==null ? "尚无配置（默认停用）" : "版本 "+configuration.version()+" / "+(configuration.enabled()?"已启用（须在有效期内）":"已停用"));
+        saved.setText(configuration==null ? "未配置" : "版本 "+configuration.version()+" / "+(configuration.enabled()?"已启用":"已停用"));
         result.setText(""); updateControls();
     }
     private void previewDraft() {
@@ -128,7 +104,7 @@ public final class PromotionManagementPanel extends JPanel implements AutoClosea
         } catch (java.text.ParseException | RuntimeException exception) { status.setText("输入无效："+exception.getMessage()); }
     }
     private void showPreview(PromotionPreviewService.Preview value) {
-        StringBuilder text=new StringBuilder("未保存参数试算；忽略启停/时间，不代表活动已发布。\n");
+        StringBuilder text=new StringBuilder();
         price.setText("¥ "+BigDecimal.valueOf(value.product().priceCents(),2)+" / "+value.product().stock()+" 件");
         var breakdown=value.breakdown();
         text.append("试算数量：").append(breakdown.quantity()).append(" 件；当前单价：¥ ")
@@ -138,7 +114,7 @@ public final class PromotionManagementPanel extends JPanel implements AutoClosea
                 .append("：¥ ").append(new BigDecimal(step.savingsCents(),2)).append('\n');
         text.append("优惠合计：¥ ").append(new BigDecimal(breakdown.savingsTotalCents(),2)).append('\n')
                 .append("预估金额：¥ ").append(new BigDecimal(breakdown.estimatedTotalCents(),2))
-                .append("\n每件先减后折，逐件四舍五入到分；不扣库存、不生成订单。");
+                ;
         result.setText(text.toString()); result.setCaretPosition(0);
     }
     private PromotionTerms terms() { return PromotionTerms.parse(reduction.getText(),discount.getText()); }
@@ -153,16 +129,16 @@ public final class PromotionManagementPanel extends JPanel implements AutoClosea
     }
     private void showStatus(PromotionManagementController.Status value) {
         busy=value.busy(); if (value.reloadRequired()) needsReload=true;
-        status.setText(value.message()); updateControls();
+        status.setText(value.message());status.setVisible(value.busy() || NoticeBar.important(value.message()));updateControls();
     }
     private void updateControls() {
         products.setEnabled(!busy); reload.setEnabled(!busy);
-        previous.setEnabled(!busy && offset>0); next.setEnabled(!busy && hasMore);
+        previous.setVisible(offset>0);next.setVisible(hasMore);previous.setEnabled(!busy && offset>0); next.setEnabled(!busy && hasMore);
         boolean editable=!busy && editor!=null && !needsReload;
         for (JComponent field: new JComponent[]{reduction,discount,start,end,enabled,quantity,preview,save}) field.setEnabled(editable);
     }
     private static void field(JPanel panel,String label,JTextField field,String name) {
-        field.setName(name); panel.add(new JLabel(label)); panel.add(field);
+        field.setName(name); panel.add(Ui.field(label,field,label.contains("时间")?"yyyy-MM-dd HH:mm:ss（北京时间）":null));
     }
     @Override public void close() { controller.close(); }
 }

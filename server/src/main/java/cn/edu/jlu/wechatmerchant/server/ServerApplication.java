@@ -13,6 +13,8 @@ import cn.edu.jlu.wechatmerchant.server.application.CouponService;
 import cn.edu.jlu.wechatmerchant.server.application.CouponHandler;
 import cn.edu.jlu.wechatmerchant.server.application.OrderService;
 import cn.edu.jlu.wechatmerchant.server.application.OrderHandler;
+import cn.edu.jlu.wechatmerchant.server.application.AfterSaleService;
+import cn.edu.jlu.wechatmerchant.server.application.AfterSaleHandler;
 import cn.edu.jlu.wechatmerchant.server.persistence.UserDao;
 import cn.edu.jlu.wechatmerchant.server.security.SessionStore;
 import cn.edu.jlu.wechatmerchant.server.persistence.ProductDao;
@@ -53,8 +55,10 @@ public final class ServerApplication {
         AuthenticationService authentication = new AuthenticationService(new UserDao(database));
         IdentityHandler identities = new IdentityHandler(authentication, sessions);
         CouponService coupons=new CouponService(database,sessions);
+        AfterSaleService returns=new AfterSaleService(database,sessions);
+        var inbox=new cn.edu.jlu.wechatmerchant.server.application.InboxService(database,sessions);
         ProbeServer server = new ProbeServer(port, new ProductQueryHandler(new ProductCatalog(new ProductDao(database))),
-                identities, new CartHandler(new CartService(database), identities),new CouponHandler(coupons,identities),new OrderHandler(new OrderService(database,sessions,coupons),identities));
+                identities, new CartHandler(new CartService(database), identities),new CouponHandler(coupons,identities),new OrderHandler(new OrderService(database,sessions,coupons),identities),new AfterSaleHandler(returns,identities),new cn.edu.jlu.wechatmerchant.server.application.InboxHandler(inbox,identities));
         String initialStatus;
         boolean started = false;
         try {
@@ -69,22 +73,13 @@ public final class ServerApplication {
         }
         final String status = initialStatus;
         final boolean ready = started;
+        var theme=cn.edu.jlu.wechatmerchant.desktop.Theme.configure("server");
         SwingUtilities.invokeLater(() -> {
-            try {
-                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            } catch (ReflectiveOperationException | UnsupportedLookAndFeelException exception) {
-                System.err.println("系统外观不可用，使用默认外观：" + exception.getMessage());
-            }
-            FontUIResource font = new FontUIResource("Microsoft YaHei UI", Font.PLAIN, 14);
-            UIManager.put("Label.font", font);
-            UIManager.put("TabbedPane.font", font);
-            UIManager.put("Button.font", font);
-            UIManager.put("TextField.font", font);
-            UIManager.put("PasswordField.font", font);
+            cn.edu.jlu.wechatmerchant.desktop.Theme.install(theme);
             ServerDesktop desktop = null;
             try {
                 desktop = new ServerDesktop(server, authentication, sessions, status, ready,
-                        new PromotionManagementService(database,sessions),coupons);
+                        new PromotionManagementService(database,sessions),coupons,returns,inbox);
                 desktop.start();
             } catch (RuntimeException exception) {
                 if (desktop != null) desktop.close();

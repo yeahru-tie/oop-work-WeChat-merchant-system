@@ -31,6 +31,7 @@ public final class LoginPanel extends JPanel {
         username.setName("login-username");
         password.setName("login-password");
         submit.setName("login-submit");
+        Theme.primary(submit);
         status.putClientProperty("html.disable", Boolean.TRUE);
         JPanel fields = new JPanel(new GridLayout(0, 1, 0, 7));
         JLabel usernameLabel = new JLabel("账号");

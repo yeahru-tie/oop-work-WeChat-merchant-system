@@ -6,6 +6,7 @@ import cn.edu.jlu.wechatmerchant.server.application.AdminController;
 import cn.edu.jlu.wechatmerchant.server.application.AuthenticationService;
 import cn.edu.jlu.wechatmerchant.server.application.PromotionManagementService;
 import cn.edu.jlu.wechatmerchant.server.application.CouponService;
+import cn.edu.jlu.wechatmerchant.server.application.AfterSaleService;
 import cn.edu.jlu.wechatmerchant.server.security.SessionStore;
 import cn.edu.jlu.wechatmerchant.server.transport.ProbeServer;
 import java.awt.event.WindowAdapter;
@@ -27,7 +28,11 @@ public final class ServerDesktop implements AutoCloseable {
     private PromotionManagementPanel promotionPanel;
     private final CouponService coupons;
     private CouponManagementPanel couponPanel;
+    private final AfterSaleService returns;
+    private AfterSaleManagementPanel returnPanel;
     private boolean closed;
+    private final cn.edu.jlu.wechatmerchant.server.application.InboxService inbox;
+    private AnnouncementPanel announcements;
 
     public ServerDesktop(ProbeServer server, AuthenticationService authentication, SessionStore sessions,
             String status, boolean ready) {
@@ -40,12 +45,22 @@ public final class ServerDesktop implements AutoCloseable {
     }
     public ServerDesktop(ProbeServer server,AuthenticationService authentication,SessionStore sessions,
             String status,boolean ready,PromotionManagementService promotions,CouponService coupons) {
+        this(server,authentication,sessions,status,ready,promotions,coupons,null);
+    }
+    public ServerDesktop(ProbeServer server,AuthenticationService authentication,SessionStore sessions,
+            String status,boolean ready,PromotionManagementService promotions,CouponService coupons,AfterSaleService returns) {
+        this(server,authentication,sessions,status,ready,promotions,coupons,returns,null);
+    }
+    public ServerDesktop(ProbeServer server,AuthenticationService authentication,SessionStore sessions,
+            String status,boolean ready,PromotionManagementService promotions,CouponService coupons,AfterSaleService returns,cn.edu.jlu.wechatmerchant.server.application.InboxService inbox) {
         requireEdt();
         this.server = server;
         this.sessions = sessions;
         this.status = status;
         this.promotions = promotions;
         this.coupons=coupons;
+        this.returns=returns;
+        this.inbox=inbox;
         gate = new AdminAccessGate(new AdminAccessGate.Views() {
             @Override public void showLogin(AdminController.State state) { showLoginEntry(state); }
             @Override public void showManagement(UserIdentity identity) { showManagementWindow(identity); }
@@ -88,6 +103,8 @@ public final class ServerDesktop implements AutoCloseable {
             promotionPanel.start();
         }
         management.bindLogoutAction(admin::logout);
+        if(inbox!=null){announcements=new AnnouncementPanel(inbox,admin::sessionToken,admin::logout,promotions);management.installAnnouncements(announcements);announcements.start();}
+        if(returns!=null){returnPanel=new AfterSaleManagementPanel(returns,admin::sessionToken,admin::logout);management.installAfterSales(returnPanel);returnPanel.start();}
         if(coupons!=null){
             couponPanel=new CouponManagementPanel(coupons,admin::sessionToken,admin::logout);
             management.installCoupons(couponPanel); couponPanel.start();
@@ -100,6 +117,8 @@ public final class ServerDesktop implements AutoCloseable {
     }
 
     private void disposeManagement() {
+        if(announcements!=null){announcements.close();announcements=null;}
+        if(returnPanel!=null){returnPanel.close();returnPanel=null;}
         if(couponPanel!=null){couponPanel.close();couponPanel=null;}
         if (promotionPanel != null) { promotionPanel.close(); promotionPanel=null; }
         if (management == null) return;

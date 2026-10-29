@@ -2,279 +2,67 @@ package cn.edu.jlu.wechatmerchant.client.ui;
 
 import cn.edu.jlu.wechatmerchant.client.application.ClientController;
 import cn.edu.jlu.wechatmerchant.protocol.ProductPage;
-import java.awt.BorderLayout;
-import java.awt.CardLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.Point;
+import cn.edu.jlu.wechatmerchant.desktop.Theme;
+import cn.edu.jlu.wechatmerchant.desktop.SurfacePanel;
+import java.awt.*;
 import java.math.BigDecimal;
-import javax.swing.BorderFactory;
-import javax.swing.DefaultListModel;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
-import javax.swing.ListCellRenderer;
-import javax.swing.ListSelectionModel;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-import javax.swing.JSpinner;
-import javax.swing.SpinnerNumberModel;
 import java.text.ParseException;
+import java.util.LinkedHashMap;
 import java.util.function.BiConsumer;
+import javax.swing.*;
 
-/** View only: consumes immutable catalog state; contains no network or database calls. */
+/** Catalog presentation only. Entry point retained; cards reuse the existing controller/cache. */
 final class ProductListPanel extends JPanel {
-    private static final long serialVersionUID = 1L;
-    private final ProductImages images;
-    private final DefaultListModel<ProductPage.Item> model = new DefaultListModel<>();
-    private final JList<ProductPage.Item> list = new JList<>(model);
-    private final JScrollPane listScroll = new JScrollPane(list);
-    private final JButton refresh = new JButton("刷新");
-    private final JButton previous = new JButton("上一页");
-    private final JButton next = new JButton("下一页");
-    private final JLabel pageNumber = label("第 1 页");
-    private final JLabel status = label("尚未加载商品");
-    private final JLabel message = label("尚未加载商品");
-    private final CardLayout resultsLayout = new CardLayout();
-    private final JPanel results = new JPanel(resultsLayout);
-    private final JLabel preview = new JLabel();
-    private final JLabel title = label("选中商品查看图片和说明");
-    private final JLabel facts = label("");
-    private final JLabel promotion = label("");
-    private final JLabel imageNote = label("");
-    private final JTextArea description = new JTextArea();
-    private ClientController.CatalogState shownCatalog;
-    private ClientController.State shownState;
-    private final JSpinner quantity=new JSpinner(new SpinnerNumberModel(1,1,Integer.MAX_VALUE,1));
-    private final JButton addToCart=new JButton("加入购物车");
-    private final JLabel cartNotice=label("登录后可加入购物车");
-
-    ProductListPanel(ProductImages images) {
-        super(new BorderLayout(0, 10));
-        this.images = images;
-        setBorder(BorderFactory.createEmptyBorder(12, 12, 10, 12));
-
-        JPanel toolbar = new JPanel(new BorderLayout(12, 0));
-        toolbar.add(label("商品目录"), BorderLayout.WEST);
-        refresh.setName("refresh-products");
-        refresh.setEnabled(false);
-        toolbar.add(refresh, BorderLayout.EAST);
-        add(toolbar, BorderLayout.NORTH);
-
-        list.setName("product-list");
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setFixedCellHeight(108);
-        list.setCellRenderer(new ProductRenderer());
-        list.getAccessibleContext().setAccessibleName("商品图文列表");
-        list.addListSelectionListener(event -> {
-            if (!event.getValueIsAdjusting()) showDetails(list.getSelectedValue());
-        });
-        listScroll.setMinimumSize(new Dimension(180, 120));
-        results.add(listScroll, "list");
-        message.setHorizontalAlignment(SwingConstants.CENTER);
-        message.setFont(message.getFont().deriveFont(15f));
-        JPanel statePanel = new JPanel(new BorderLayout());
-        statePanel.add(message, BorderLayout.CENTER);
-        results.add(statePanel, "message");
-        resultsLayout.show(results, "message");
-
-        JPanel detail = new JPanel(new BorderLayout(16, 0));
-        detail.setBorder(BorderFactory.createEmptyBorder(10, 4, 0, 4));
-        preview.setPreferredSize(new Dimension(176, 176));
-        preview.setHorizontalAlignment(SwingConstants.CENTER);
-        preview.setVerticalAlignment(SwingConstants.TOP);
-        detail.add(preview, BorderLayout.WEST);
-        JPanel detailText = new JPanel(new BorderLayout(0, 6));
-        JPanel summary = new JPanel(new GridLayout(0, 1, 0, 5));
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 16f));
-        summary.add(title);
-        summary.add(facts);
-        promotion.setName("product-promotion");
-        summary.add(promotion);
-        detailText.add(summary, BorderLayout.NORTH);
-        description.setName("product-description");
-        description.setEditable(false);
-        description.setLineWrap(true);
-        description.setWrapStyleWord(true);
-        description.setOpaque(false);
-        description.setFont(title.getFont().deriveFont(Font.PLAIN, 14f));
-        description.setRows(3);
-        JScrollPane descriptionScroll = new JScrollPane(description);
-        descriptionScroll.setBorder(BorderFactory.createEmptyBorder());
-        descriptionScroll.setOpaque(false);
-        descriptionScroll.getViewport().setOpaque(false);
-        detailText.add(descriptionScroll, BorderLayout.CENTER);
-        imageNote.setForeground(new Color(95, 104, 116));
-        JPanel purchase=new JPanel(new GridLayout(0,1,0,4));
-        JPanel controls=new JPanel(new FlowLayout(FlowLayout.LEFT,8,0));
-        quantity.setName("product-quantity");
-        addToCart.setName("add-to-cart");
-        addToCart.setEnabled(false);
-        controls.add(label("数量")); controls.add(quantity); controls.add(addToCart);
-        purchase.add(imageNote); purchase.add(controls); purchase.add(cartNotice);
-        detailText.add(purchase, BorderLayout.SOUTH);
-        detail.add(detailText, BorderLayout.CENTER);
-        detail.setMinimumSize(new Dimension(180, 245));
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, results, detail);
-        split.setResizeWeight(1.0);
-        split.setDividerLocation(285);
-        split.setBorder(BorderFactory.createEmptyBorder());
-        add(split, BorderLayout.CENTER);
-
-        JPanel footer = new JPanel(new BorderLayout(12, 0));
-        footer.add(status, BorderLayout.CENTER);
-        JPanel pages = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        previous.setName("previous-products");
-        next.setName("next-products");
-        previous.setEnabled(false);
-        next.setEnabled(false);
-        pages.add(previous);
-        pages.add(pageNumber);
-        pages.add(next);
-        footer.add(pages, BorderLayout.EAST);
-        add(footer, BorderLayout.SOUTH);
-        showDetails(null);
+    private final ProductImages images;private final CardGrid grid=new CardGrid();private final JScrollPane scroll=new JScrollPane(grid);
+    private final LinkedHashMap<Long,ProductCard> cards=new LinkedHashMap<>();
+    private final JButton refresh=new JButton("刷新商品"),previous=new JButton("上一页"),next=new JButton("下一页");
+    private final JLabel status=label("尚未加载商品"),pageNumber=label("第 1 页");
+    private final JTextArea notice=text("欢迎浏览，登录后可保存本人购物车。",2);
+    private ClientController.State state;private ClientController.CatalogState shownCatalog;
+    private BiConsumer<Long,Integer> add;private Runnable login;private Long focus;
+    ProductListPanel(ProductImages images){
+        super(new BorderLayout(0,14));this.images=images;setBorder(BorderFactory.createEmptyBorder());
+        var heading=new JPanel(new BorderLayout());var title=label("发现好物");title.setFont(title.getFont().deriveFont(Font.BOLD,22f));heading.add(status,BorderLayout.WEST);refresh.setName("refresh-products");heading.add(refresh,BorderLayout.EAST);add(heading,BorderLayout.NORTH);
+        grid.setName("product-cards");scroll.setBorder(BorderFactory.createEmptyBorder());scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);scroll.getVerticalScrollBar().setUnitIncrement(24);add(scroll,BorderLayout.CENTER);
+        var footer=new JPanel(new BorderLayout(8,8));var pages=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));previous.setName("previous-products");next.setName("next-products");pages.add(previous);pages.add(pageNumber);pages.add(next);footer.add(pages,BorderLayout.EAST);footer.add(notice,BorderLayout.SOUTH);Theme.muted(notice);add(footer,BorderLayout.SOUTH);refresh.setEnabled(false);previous.setEnabled(false);next.setEnabled(false);
     }
-
-    void bindActions(Runnable reload, Runnable goPrevious, Runnable goNext) {
-        refresh.addActionListener(event -> reload.run());
-        previous.addActionListener(event -> goPrevious.run());
-        next.addActionListener(event -> goNext.run());
-    }
-
-    void showState(ClientController.State state) {
-        shownState=state;
-        updatePurchaseActions();
-        refresh.setEnabled(!state.busy());
-        previous.setEnabled(state.canGoPrevious());
-        next.setEnabled(state.canGoNext());
-        ClientController.CatalogState catalog = state.catalog();
-        // PING changes busy/connection status only; retain selection and scroll position.
-        if (shownCatalog == catalog) return;
-        shownCatalog = catalog;
-        status.setText(catalog.message());
-        pageNumber.setText("第 " + ((long) catalog.targetOffset() / ClientController.PAGE_SIZE + 1) + " 页");
-        model.clear();
-        showDetails(null);
-        if (catalog.status() == ClientController.CatalogStatus.READY && catalog.page() != null) {
-            model.addAll(catalog.page().items());
-            resultsLayout.show(results, "list");
-            list.setSelectedIndex(0);
-            // The list card may have had zero viewport height while hidden. Reset after layout,
-            // otherwise ensureIndexIsVisible can scroll past the first item's name on first load.
-            SwingUtilities.invokeLater(() -> {
-                if (shownCatalog == catalog) listScroll.getViewport().setViewPosition(new Point(0, 0));
-            });
-        } else {
-            message.setText(catalog.message());
-            resultsLayout.show(results, "message");
+    void bindActions(Runnable reload,Runnable goPrevious,Runnable goNext){refresh.addActionListener(e -> reload.run());previous.addActionListener(e -> goPrevious.run());next.addActionListener(e -> goNext.run());}
+    void bindCartAction(BiConsumer<Long,Integer> add,Runnable login){this.add=add;this.login=login;}
+    void focusProduct(long id){focus=id;focusCard();}
+    private void focusCard(){if(focus==null || !cards.containsKey(focus))return;var card=cards.get(focus);SwingUtilities.invokeLater(() -> {if(cards.get(card.item.productId())==card){grid.scrollRectToVisible(card.getBounds());card.addButton.requestFocusInWindow();}});}
+    void showState(ClientController.State value){
+        state=value;refresh.setEnabled(!value.busy());previous.setEnabled(value.canGoPrevious());next.setEnabled(value.canGoNext());previous.setVisible(value.catalog().targetOffset()>0);next.setVisible(value.catalog().page()!=null && value.catalog().page().hasMore());pageNumber.setVisible(previous.isVisible() || next.isVisible());String cartMessage=value.cart().message();notice.setText(cn.edu.jlu.wechatmerchant.desktop.NoticeBar.important(cartMessage)?cartMessage:"");notice.setVisible(!notice.getText().isEmpty());
+        var catalog=value.catalog();if(shownCatalog!=catalog){shownCatalog=catalog;cards.clear();grid.removeAll();status.setText(catalog.status()==ClientController.CatalogStatus.READY?catalog.page().items().size()+" 种商品":catalog.message());pageNumber.setText("第 "+((long)catalog.targetOffset()/ClientController.PAGE_SIZE+1)+" 页");if(catalog.status()==ClientController.CatalogStatus.READY && catalog.page()!=null){for(var item:catalog.page().items()){var card=new ProductCard(item);cards.put(item.productId(),card);grid.add(card);}}else{var message=label(catalog.message());message.setHorizontalAlignment(SwingConstants.CENTER);grid.add(message);}
+            grid.revalidate();grid.repaint();SwingUtilities.invokeLater(() -> {if(shownCatalog==catalog){scroll.getViewport().setViewPosition(new Point(0,0));focusCard();}});
         }
+        for(var card:cards.values())card.controls();
     }
-
-    private void showDetails(ProductPage.Item product) {
-        quantity.setValue(1);
-        updatePurchaseActions();
-        if (product == null) {
-            preview.setIcon(null);
-            title.setText("选中商品查看图片和说明");
-            facts.setText("");
-            promotion.setText("");
-            description.setText("");
-            imageNote.setText("");
-            return;
+    private final class ProductCard extends SurfacePanel {
+        private final ProductPage.Item item;private final JSpinner quantity=new JSpinner(new SpinnerNumberModel(1,1,Integer.MAX_VALUE,1));private final JButton addButton=new JButton("加入购物车");
+        ProductCard(ProductPage.Item item){
+            super(new BorderLayout(0,10));this.item=item;setName("product-card-"+item.productId());
+            var visual=new JPanel(new BorderLayout(0,10));visual.setOpaque(false);var pictures=images.forProduct(item);var picture=new JLabel(pictures.preview(),SwingConstants.CENTER);picture.setPreferredSize(new Dimension(176,176));visual.add(picture,BorderLayout.CENTER);
+            var summary=new JPanel(new GridLayout(0,1,0,5));summary.setOpaque(false);var name=label(item.name());name.setFont(name.getFont().deriveFont(Font.BOLD,18f));summary.add(name);var price=label(priceText(item.promotion()==null?item.priceCents():item.promotion().estimatedUnitCents()));price.setName("product-price");price.setFont(price.getFont().deriveFont(Font.BOLD,22f));price.setForeground(Theme.accent());price.putClientProperty("theme.accent",true);summary.add(price);var stock=label("库存 "+item.stock()+" 件  ·  "+(pictures.demo()?"AI 演示图":"暂无图片"));stock.setFont(stock.getFont().deriveFont(12f));Theme.muted(stock);summary.add(stock);visual.add(summary,BorderLayout.SOUTH);add(visual,BorderLayout.NORTH);
+            var details=new JPanel(new BorderLayout(0,6));details.setOpaque(false);var description=text(item.description().isBlank()?"暂无商品说明":item.description(),3);description.setName("product-description");var toggle=new JButton("详情");toggle.putClientProperty("theme.ghost",true);toggle.setName("product-details");description.setVisible(false);toggle.addActionListener(e -> {description.setVisible(!description.isVisible());toggle.setText(description.isVisible()?"收起":"详情");grid.revalidate();});
+            details.add(description,BorderLayout.CENTER);details.add(cn.edu.jlu.wechatmerchant.desktop.Ui.row(toggle),BorderLayout.NORTH);var activity=text(PromotionText.activity(item.promotion()),2);activity.setName("product-promotion");Theme.muted(activity);activity.setRows(1);activity.setVisible(item.promotion()!=null && (item.promotion().reductionCents()>0 || item.promotion().discountHundredths()<1000));details.add(activity,BorderLayout.SOUTH);add(details,BorderLayout.CENTER);
+            var actions=new JPanel(new BorderLayout(12,0));actions.setOpaque(false);quantity.setName("product-quantity");quantity.setPreferredSize(new Dimension(132,42));addButton.setName("add-to-cart");Theme.primary(addButton);actions.add(quantity,BorderLayout.WEST);actions.add(addButton,BorderLayout.CENTER);add(actions,BorderLayout.SOUTH);
+            addButton.addActionListener(e -> {if(state==null || state.busy())return;if(state.identity()==null){if(login!=null)login.run();return;}if(!state.canModifyCart() || add==null)return;try{quantity.commitEdit();add.accept(item.productId(),(Integer)quantity.getValue());}catch(ParseException | IllegalArgumentException ex){notice.setText("请输入1到2147483647之间的整数数量。");}});
         }
-        ProductImages.Pictures pictures = images.forProduct(product);
-        preview.setIcon(pictures.preview());
-        title.setText(product.name());
-        facts.setText(priceText(product.priceCents()) + "    库存 " + product.stock() + " 件");
-        promotion.setText(PromotionText.activity(product.promotion())
-                +(product.promotion()==null ? "" : "    预估单价 "+priceText(product.promotion().estimatedUnitCents())));
-        description.setText(product.description().isBlank() ? "暂无商品说明" : product.description());
-        description.setCaretPosition(0);
-        imageNote.setText(pictures.demo() ? "AI 生成演示图，仅供课程展示" : "暂无商品图片");
+        void controls(){boolean available=state!=null && !state.busy() && item.stock()>0;quantity.setEnabled(available);addButton.setEnabled(available && (state.identity()==null || state.canModifyCart()));addButton.setText(item.stock()==0?"暂时售罄":"加入购物车");}
     }
-
-    void bindCartAction(BiConsumer<Long,Integer> add,Runnable login) {
-        addToCart.addActionListener(event -> {
-            if (shownState==null || shownState.busy()) return;
-            if (shownState.identity()==null) { login.run(); return; }
-            ProductPage.Item product=list.getSelectedValue();
-            if (product==null || !shownState.canModifyCart()) return;
-            try {
-                quantity.commitEdit();
-                add.accept(product.productId(),(Integer)quantity.getValue());
-            } catch (ParseException | IllegalArgumentException exception) {
-                cartNotice.setText("请输入 1 到 2147483647 之间的整数数量");
-            }
-        });
-    }
-
-    private void updatePurchaseActions() {
-        ProductPage.Item product=list.getSelectedValue();
-        boolean available=shownState!=null && !shownState.busy() && product!=null && product.stock()>0;
-        quantity.setEnabled(available);
-        addToCart.setEnabled(available && (shownState.identity()==null || shownState.canModifyCart()));
-        if (shownState!=null) cartNotice.setText(shownState.identity()==null ? "登录后可保存本人购物车" : shownState.cart().message());
-    }
-
-    static String priceText(long cents) {
-        if (cents < 0) throw new IllegalArgumentException("Price cannot be negative.");
-        return "¥ " + BigDecimal.valueOf(cents, 2).toPlainString();
-    }
-
-    private static JLabel label(String text) {
-        JLabel label = new JLabel();
-        label.putClientProperty("html.disable", Boolean.TRUE);
-        label.setText(text);
-        return label;
-    }
-
-    private final class ProductRenderer extends JPanel implements ListCellRenderer<ProductPage.Item> {
-        private static final long serialVersionUID = 1L;
-        private final JLabel picture = new JLabel();
-        private final JLabel name = label("");
-        private final JLabel amount = label("");
-        private final JLabel stock = label("");
-
-        ProductRenderer() {
-            super(new BorderLayout(16, 0));
-            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0,
-                    new Color(228, 232, 237)), BorderFactory.createEmptyBorder(9, 12, 9, 12)));
-            picture.setPreferredSize(new Dimension(88, 88));
-            add(picture, BorderLayout.WEST);
-            JPanel text = new JPanel(new GridLayout(0, 1, 0, 3));
-            text.setOpaque(false);
-            name.setFont(name.getFont().deriveFont(Font.BOLD, 16f));
-            amount.setFont(amount.getFont().deriveFont(Font.BOLD, 17f));
-            text.add(name);
-            text.add(amount);
-            text.add(stock);
-            add(text, BorderLayout.CENTER);
-        }
-
-        @Override
-        public Component getListCellRendererComponent(JList<? extends ProductPage.Item> owner, ProductPage.Item product,
-                int index, boolean selected, boolean focused) {
-            picture.setIcon(images.forProduct(product).thumbnail());
-            name.setText(product.name());
-            amount.setText(product.promotion()!=null && product.promotion().estimatedUnitCents()!=product.priceCents()
-                    ? "预估 "+priceText(product.promotion().estimatedUnitCents())+"    原价 "+priceText(product.priceCents())
-                    : priceText(product.priceCents()));
-            stock.setText("库存 " + product.stock() + " 件");
-            Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-            name.setForeground(foreground);
-            stock.setForeground(foreground);
-            amount.setForeground(selected ? foreground : new Color(20, 93, 101));
-            setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-            return this;
-        }
+    static String priceText(long cents){if(cents<0)throw new IllegalArgumentException("Price cannot be negative.");return "¥ "+BigDecimal.valueOf(cents,2).toPlainString();}
+    private static JLabel label(String value){var label=new JLabel();label.putClientProperty("html.disable",true);label.setText(value);return label;}
+    private static JTextArea text(String value,int rows){var area=new JTextArea(value,rows,16);area.setEditable(false);area.setFocusable(false);area.setLineWrap(true);area.setWrapStyleWord(true);area.setOpaque(false);area.setFont(new JLabel().getFont());return area;}
+    private static final class CardGrid extends JPanel implements Scrollable {
+        CardGrid(){setLayout(null);}
+        private int columns(){return Math.max(1,Math.min(3,(getWidth()+24)/344));}
+        private int height(){int h=380;for(Component card:getComponents())h=Math.max(h,card.getPreferredSize().height);return h;}
+        @Override public Dimension getPreferredSize(){int rows=(getComponentCount()+columns()-1)/columns();return new Dimension(Math.max(280,getWidth()),rows==0?0:rows*(height()+24)-24);}
+        @Override public void doLayout(){int columns=columns(),width=Math.max(1,(getWidth()-(columns-1)*24)/columns),h=height();for(int i=0;i<getComponentCount();i++)getComponent(i).setBounds(i%columns*(width+24),i/columns*(h+24),width,h);}
+        @Override public Dimension getPreferredScrollableViewportSize(){return new Dimension(850,460);}
+        @Override public int getScrollableUnitIncrement(Rectangle r,int o,int d){return 24;}
+        @Override public int getScrollableBlockIncrement(Rectangle r,int o,int d){return Math.max(24,r.height-24);}
+        @Override public boolean getScrollableTracksViewportWidth(){return true;}
+        @Override public boolean getScrollableTracksViewportHeight(){return false;}
     }
 }

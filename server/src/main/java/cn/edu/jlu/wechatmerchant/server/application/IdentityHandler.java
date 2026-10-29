@@ -67,8 +67,11 @@ public final class IdentityHandler {
     }
 
     public BuyerAccess requireBuyer(Messages.Request request) {
+        return requireBuyer(request,true);
+    }
+    public BuyerAccess requireBuyer(Messages.Request request,boolean touch) {
         try {
-            var identity = sessions.resolve(request.sessionToken());
+            var identity = touch?sessions.resolve(request.sessionToken()):sessions.peek(request.sessionToken());
             if (identity.isEmpty()) return new BuyerAccess(null, error(request, "UNAUTHENTICATED", "登录已失效，请重新登录。"));
             if (identity.get().role() != UserIdentity.Role.BUYER) return new BuyerAccess(null, error(request, "FORBIDDEN", "当前身份无权执行此操作。"));
             if (!authentication.isEnabled(identity.get())) {

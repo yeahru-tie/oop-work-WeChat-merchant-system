@@ -21,7 +21,7 @@ public record OrderSnapshot(long orderId,String checkoutKey,long createdAt,Strin
         }
     }
     public OrderSnapshot {
-        if(orderId<=0 || createdAt<0 || checkoutKey==null || !checkoutKey.matches("[0-9a-f-]{36}") || !"COMPLETED".equals(status)
+        if(orderId<=0 || createdAt<0 || checkoutKey==null || !checkoutKey.matches("[0-9a-f-]{36}") || !validStatus(status)
                 || items==null || items.isEmpty() || items.size()>100)throw new IllegalArgumentException("Invalid order.");
         items=List.copyOf(items);long previous=0;var products=new HashSet<Long>();
         for(var item:items){if(item.cartItemId()<=previous || !products.add(item.productId()))throw new IllegalArgumentException("Invalid order item ordering.");previous=item.cartItemId();}
@@ -31,6 +31,7 @@ public record OrderSnapshot(long orderId,String checkoutKey,long createdAt,Strin
         if(!original.equals(originalCents) || !original.subtract(subtotal).equals(productReductionCents) || !reduction.equals(couponReductionCents)
                 || !subtotal.subtract(reduction).equals(paidCents) || coupon!=null && (subtotal.compareTo(BigInteger.valueOf(coupon.thresholdCents()))<0 || createdAt<coupon.startsAt() || createdAt>=coupon.endsAt()))throw new IllegalArgumentException("Inconsistent historical totals.");
     }
+    public static boolean validStatus(String status){return status!=null && Set.of("COMPLETED","RETURN_REQUESTED","REFUNDED").contains(status);}
     public static OrderSnapshot parse(JsonObject body) throws ProtocolException {
         try {
             JsonFields.fields(body,"orderId","checkoutKey","createdAt","status","items","coupon","originalCents","productReductionCents","couponReductionCents","paidCents");

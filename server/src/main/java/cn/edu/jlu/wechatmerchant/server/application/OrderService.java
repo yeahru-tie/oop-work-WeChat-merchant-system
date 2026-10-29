@@ -49,6 +49,7 @@ public final class OrderService {
                         s.setLong(1,order.orderId());s.setLong(2,user);s.setLong(3,request.couponId());if(s.executeUpdate()!=1)throw new Rejected("COUPON_INVALID");}}
                     for(long item:request.itemIds())if(carts.remove(c,user,item)!=1)throw new Rejected("CART_CHANGED");
                     carts.advance(c,user,request.cartVersion()+1);
+                    NotificationDao.insert(c,user,"order:"+order.orderId(),"ORDER","模拟成交成功","订单 #"+order.orderId()+" 已成交，可查看商品与原实付明细。",order.createdAt(),order.orderId(),null);
                     orders.finish(c,user,request.checkoutKey(),order.orderId(),null);c.releaseSavepoint(savepoint);c.commit();
                     return new CheckoutReceipt(request.checkoutKey(),"SUCCESS",order,null);
                 } catch(Rejected ex){

@@ -18,7 +18,7 @@ class CouponMigrationTest {
         String admin=sessions.create(new UserDao(db).findByUsername("shop_admin").orElseThrow().identity());
         new PromotionManagementService(db,sessions).save(admin,new PromotionConfiguration(1001,0,new PromotionTerms(100,900),Instant.parse("2026-01-01T00:00:00Z"),Instant.parse("2030-01-01T00:00:00Z"),true));
         try(var c=db.openWriteConnection();var s=c.createStatement()) {
-            s.execute("DROP TABLE checkout_attempts");s.execute("DROP TABLE order_items");s.execute("DROP TABLE orders");s.execute("DROP TABLE user_coupons");s.execute("DROP TABLE coupon_campaigns");s.execute("PRAGMA user_version=4");s.executeUpdate("UPDATE users SET enabled=0 WHERE user_id=2");
+            s.execute("DROP TABLE message_reads");s.execute("DROP TABLE notifications");s.execute("DROP TABLE refunds");s.execute("DROP TABLE return_attempts");s.execute("DROP TABLE after_sales");s.execute("DROP TABLE checkout_attempts");s.execute("DROP TABLE order_items");s.execute("DROP TABLE orders");s.execute("DROP TABLE user_coupons");s.execute("DROP TABLE coupon_campaigns");s.execute("PRAGMA user_version=4");s.executeUpdate("UPDATE users SET enabled=0 WHERE user_id=2");
         }
         return db;
     }

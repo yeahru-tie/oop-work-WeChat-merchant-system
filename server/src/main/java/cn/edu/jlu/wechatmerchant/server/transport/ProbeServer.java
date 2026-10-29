@@ -8,6 +8,7 @@ import cn.edu.jlu.wechatmerchant.server.application.IdentityHandler;
 import cn.edu.jlu.wechatmerchant.server.application.CartHandler;
 import cn.edu.jlu.wechatmerchant.server.application.CouponHandler;
 import cn.edu.jlu.wechatmerchant.server.application.OrderHandler;
+import cn.edu.jlu.wechatmerchant.server.application.AfterSaleHandler;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -30,6 +31,8 @@ public final class ProbeServer implements AutoCloseable {
     private final CartHandler carts;
     private final CouponHandler coupons;
     private final OrderHandler orders;
+    private final AfterSaleHandler returns;
+    private final cn.edu.jlu.wechatmerchant.server.application.InboxHandler inbox;
     private final ExecutorService tasks = Executors.newVirtualThreadPerTaskExecutor();
     private final Set<Socket> connections = ConcurrentHashMap.newKeySet();
     private final Semaphore slots = new Semaphore(16);
@@ -71,6 +74,18 @@ public final class ProbeServer implements AutoCloseable {
         this(port,NetworkDefaults.SERVER_FRAME_TIMEOUT_MS,products,identities,carts,coupons,orders);
     }
     private ProbeServer(int port,int frameTimeoutMillis,ProductQueryHandler products,IdentityHandler identities,CartHandler carts,CouponHandler coupons,OrderHandler orders) {
+        this(port,frameTimeoutMillis,products,identities,carts,coupons,orders,null);
+    }
+    public ProbeServer(int port,ProductQueryHandler products,IdentityHandler identities,CartHandler carts,CouponHandler coupons,OrderHandler orders,AfterSaleHandler returns){
+        this(port,NetworkDefaults.SERVER_FRAME_TIMEOUT_MS,products,identities,carts,coupons,orders,returns);
+    }
+    private ProbeServer(int port,int frameTimeoutMillis,ProductQueryHandler products,IdentityHandler identities,CartHandler carts,CouponHandler coupons,OrderHandler orders,AfterSaleHandler returns) {
+        this(port,frameTimeoutMillis,products,identities,carts,coupons,orders,returns,null);
+    }
+    public ProbeServer(int port,ProductQueryHandler products,IdentityHandler identities,CartHandler carts,CouponHandler coupons,OrderHandler orders,AfterSaleHandler returns,cn.edu.jlu.wechatmerchant.server.application.InboxHandler inbox){
+        this(port,NetworkDefaults.SERVER_FRAME_TIMEOUT_MS,products,identities,carts,coupons,orders,returns,inbox);
+    }
+    private ProbeServer(int port,int frameTimeoutMillis,ProductQueryHandler products,IdentityHandler identities,CartHandler carts,CouponHandler coupons,OrderHandler orders,AfterSaleHandler returns,cn.edu.jlu.wechatmerchant.server.application.InboxHandler inbox) {
         if (port < 0 || port > 65535 || frameTimeoutMillis <= 0) {
             throw new IllegalArgumentException("Invalid server configuration.");
         }
@@ -81,6 +96,8 @@ public final class ProbeServer implements AutoCloseable {
         this.carts = carts;
         this.coupons = coupons;
         this.orders=orders;
+        this.returns=returns;
+        this.inbox=inbox;
     }
 
     public synchronized void start() throws IOException {
@@ -147,6 +164,10 @@ public final class ProbeServer implements AutoCloseable {
                 } else if (identities != null && identities.handles(request.operation())) {
                     FrameCodec.write(socket.getOutputStream(), identities.handle(request));
                     continue;
+                } else if(inbox!=null && inbox.handles(request.operation())) {
+                    FrameCodec.write(socket.getOutputStream(),inbox.handle(request));continue;
+                } else if(returns!=null && returns.handles(request.operation())) {
+                    FrameCodec.write(socket.getOutputStream(),returns.handle(request));continue;
                 } else if(orders!=null && orders.handles(request.operation())) {
                     FrameCodec.write(socket.getOutputStream(),orders.handle(request));continue;
                 } else if(coupons!=null && coupons.handles(request.operation())) {

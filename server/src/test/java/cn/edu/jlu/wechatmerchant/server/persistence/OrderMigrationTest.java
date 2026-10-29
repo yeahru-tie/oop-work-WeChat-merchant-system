@@ -21,7 +21,7 @@ class OrderMigrationTest {
         var coupons=new CouponService(db,sessions);var draft=coupons.saveDraft(admin,new CouponCampaign(0,0,"保留的券",0,100,now.minusSeconds(60).toEpochMilli(),now.plusSeconds(3600).toEpochMilli(),7,0,false,false),java.util.UUID.randomUUID().toString());
         coupons.publish(admin,draft.campaignId(),draft.version());coupons.claim(buyer,draft.campaignId());
         try(var c=db.openWriteConnection();var s=c.createStatement()) {
-            s.execute("ALTER TABLE user_coupons DROP COLUMN used_order_id");s.execute("DROP TABLE checkout_attempts");s.execute("DROP TABLE order_items");s.execute("DROP TABLE orders");s.execute("PRAGMA user_version=5");s.executeUpdate("UPDATE users SET enabled=0 WHERE user_id=2");
+            s.execute("DROP TABLE message_reads");s.execute("DROP TABLE notifications");s.execute("DROP TABLE refunds");s.execute("DROP TABLE return_attempts");s.execute("DROP TABLE after_sales");s.execute("ALTER TABLE user_coupons DROP COLUMN used_order_id");s.execute("DROP TABLE checkout_attempts");s.execute("DROP TABLE order_items");s.execute("DROP TABLE orders");s.execute("PRAGMA user_version=5");s.executeUpdate("UPDATE users SET enabled=0 WHERE user_id=2");
         }
         return db;
     }

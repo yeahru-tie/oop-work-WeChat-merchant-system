@@ -11,6 +11,9 @@ import cn.edu.jlu.wechatmerchant.protocol.CheckoutRequest;
 import cn.edu.jlu.wechatmerchant.protocol.CheckoutReceipt;
 import cn.edu.jlu.wechatmerchant.protocol.OrderSnapshot;
 import cn.edu.jlu.wechatmerchant.protocol.OrderPage;
+import cn.edu.jlu.wechatmerchant.protocol.ApplyReturnRequest;
+import cn.edu.jlu.wechatmerchant.protocol.AfterSaleReceipt;
+import cn.edu.jlu.wechatmerchant.protocol.AfterSalePage;
 import cn.edu.jlu.wechatmerchant.protocol.ProtocolException;
 import cn.edu.jlu.wechatmerchant.protocol.UserIdentity;
 import com.google.gson.JsonObject;
@@ -86,6 +89,13 @@ public final class MerchantClient implements AutoCloseable {
         return cartRequest(Messages.LIST_CART,new JsonObject(),cancelled);
     }
 
+    public cn.edu.jlu.wechatmerchant.protocol.InboxPage messages(int limit,int offset,Long readId,BooleanSupplier cancelled) throws IOException {
+        if(limit<1 || limit>100 || offset<0 || readId!=null && readId<=0)throw new IllegalArgumentException("Invalid inbox query.");
+        JsonObject body=new JsonObject();body.addProperty("limit",limit);body.addProperty("offset",offset);
+        int op=readId==null?Messages.LIST_MESSAGES:Messages.READ_MESSAGE;if(readId!=null)body.addProperty("messageId",readId);
+        return request(cancelled,id -> Messages.authenticatedRequest(id,op,token(),body),(value,id) -> cn.edu.jlu.wechatmerchant.protocol.InboxPage.parse(successful(value,id,op+1000).body(),limit,offset));
+    }
+
     public CouponPage listCoupons(String kind,int limit,int offset,BooleanSupplier cancelled) throws IOException {
         return listCoupons(kind,limit,offset,null,cancelled);
     }
@@ -139,6 +149,16 @@ public final class MerchantClient implements AutoCloseable {
         JsonObject body=new JsonObject();
         body.addProperty("productId",product); body.addProperty("quantity",quantity); body.addProperty("cartVersion",version);
         return cartRequest(Messages.ADD_TO_CART,body,cancelled);
+    }
+    public AfterSaleReceipt applyReturn(ApplyReturnRequest command,BooleanSupplier cancelled) throws IOException {
+        var body=new com.google.gson.Gson().toJsonTree(command).getAsJsonObject();return request(cancelled,id -> Messages.authenticatedRequest(id,Messages.APPLY_RETURN,token(),body),(value,id) -> {
+            var receipt=AfterSaleReceipt.parse(successful(value,id,Messages.APPLY_RETURN+1000).body(),command.returnKey());if(receipt.application()!=null && receipt.application().orderId()!=command.orderId())throw new ProtocolException("Wrong application order.");return receipt;});
+    }
+    public AfterSaleReceipt returnResult(String key,BooleanSupplier cancelled) throws IOException {
+        var body=new JsonObject();body.addProperty("mode","BY_KEY");body.addProperty("returnKey",key);return request(cancelled,id -> Messages.authenticatedRequest(id,Messages.QUERY_RETURNS,token(),body),(value,id) -> AfterSaleReceipt.parse(successful(value,id,Messages.QUERY_RETURNS+1000).body(),key));
+    }
+    public AfterSalePage returnHistory(long order,int limit,int offset,BooleanSupplier cancelled) throws IOException {
+        var body=new JsonObject();body.addProperty("mode","HISTORY");body.addProperty("orderId",order);body.addProperty("limit",limit);body.addProperty("offset",offset);return request(cancelled,id -> Messages.authenticatedRequest(id,Messages.QUERY_RETURNS,token(),body),(value,id) -> AfterSalePage.parse(successful(value,id,Messages.QUERY_RETURNS+1000).body(),order,limit,offset));
     }
 
     public CartSnapshot editCart(long item,Integer quantity,long version,BooleanSupplier cancelled) throws IOException {

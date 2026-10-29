@@ -59,7 +59,7 @@ class CheckoutFlowIntegrationTest {
                 SwingUtilities.invokeAndWait(() -> assertFalse(((JCheckBox)named(view.get(),"cart-selected-"+second)).isSelected()));
                 try(var c=f.db.openWriteConnection();var s=c.createStatement()){s.executeUpdate("UPDATE products SET name='改名',price_cents=1 WHERE product_id=1001");}
                 SwingUtilities.invokeAndWait(() -> controller.refreshOrders(0));var page=await(updates,s -> !s.busy() && s.orders().page()!=null);long id=page.orders().page().items().getFirst().orderId();SwingUtilities.invokeAndWait(() -> controller.loadOrder(id));await(updates,s -> !s.busy() && s.orders().detail()!=null);
-                SwingUtilities.invokeAndWait(() -> {String text=((JTextArea)named(history.get(),"order-content")).getText();assertTrue(text.contains("142.00"));assertTrue(text.contains("演示笔记本"));assertFalse(text.contains("改名"));});
+                SwingUtilities.invokeAndWait(() -> {String text=ViewText.of(named(history.get(),"order-content"));assertTrue(text.contains("142.00"));assertTrue(text.contains("演示笔记本"));assertFalse(text.contains("改名"));});
                 SwingUtilities.invokeAndWait(controller::logout);await(updates,s -> !s.busy() && s.identity()==null);SwingUtilities.invokeAndWait(() -> assertEquals(0,((JList<?>)named(history.get(),"order-list")).getModel().getSize()));
             }
         }

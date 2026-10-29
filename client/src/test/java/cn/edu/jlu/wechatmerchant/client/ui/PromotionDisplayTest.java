@@ -20,11 +20,11 @@ class PromotionDisplayTest {
                     new UserIdentity(1,"buyer_a","买家 A",UserIdentity.Role.BUYER),"",ClientController.Action.NONE,
                     new ClientController.CartState(ClientController.CartStatus.READY,cart,"已加载"));
             view.showState(state);
-            String details=((JTextArea)named(view,"cart-promotion-1")).getText();
+            String details=((JTextArea)named(view,"cart-promotion-1")).getToolTipText();
             assertTrue(details.contains("直降优惠：¥ 2.00")); assertTrue(details.contains("折扣优惠：¥ 2.38"));
-            assertTrue(((JTextArea)named(view,"cart-total")).getText().contains("预估合计：¥ 21.42"));
+            assertTrue(((JLabel)named(view,"cart-total")).getText().contains("21.42"));
             view.showState(new ClientController.State(false,"",state.catalog()));
-            assertEquals("",((JTextArea)named(view,"cart-total")).getText());
+            assertEquals("",((JLabel)named(view,"cart-total")).getText());
             assertNull(find(view,"cart-promotion-1"));
         });
     }
@@ -36,9 +36,9 @@ class PromotionDisplayTest {
                 var promotion=active ? new PromotionPrice(1,1290,100,900,1190,1071) : new PromotionPrice(1,1290,0,1000,1290,1290);
                 var page=new ProductPage(List.of(new ProductPage.Item(1001,"商品",1290,20,"说明",promotion)),20,0,false);
                 view.showState(new ClientController.State(false,"",new ClientController.CatalogState(ClientController.CatalogStatus.READY,page,0,"")));
-                String text=((JLabel)named(view,"product-promotion")).getText();
+                String text=((javax.swing.JTextArea)named(view,"product-promotion")).getText();
                 assertTrue(text.contains(active ? "每件减 ¥ 1.00，再9折" : "暂无生效优惠"));
-                assertTrue(text.contains(active ? "10.71" : "12.90"));
+                assertTrue(((JLabel)named(view,"product-price")).getText().contains(active ? "10.71" : "12.90"));
             }
         });
     }

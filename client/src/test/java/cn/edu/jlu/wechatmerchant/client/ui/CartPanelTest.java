@@ -33,7 +33,7 @@ class CartPanelTest {
             panel.showState(ready(contents()));
             assertEquals(1,((Container)named(panel,"cart-cards")).getComponentCount());
             assertEquals("<html>普通商品文本",((JTextArea)named(panel,"cart-name-5")).getText());
-            assertEquals("原价小计：¥ 184467440737095516.14\n预估小计：¥ 184467440737095516.14",((JTextArea)named(panel,"cart-subtotal-5")).getText());
+            assertEquals("¥ 184467440737095516.14",((JTextArea)named(panel,"cart-subtotal-5")).getText());
             assertTrue(labels(panel).stream().anyMatch(l -> l.getText().contains("库存不足")));
             assertNull(find(panel,"save-cart-quantity"));
             assertNull(find(panel,"remove-cart-item"));
@@ -80,10 +80,10 @@ class CartPanelTest {
             assertFalse(named(panel,"remove-cart-item-5").isEnabled());
             ((JButton)named(panel,"remove-cart-item-5")).doClick();
             assertTrue(edits.isEmpty());
-            assertTrue(((JTextArea)named(panel,"cart-total")).getText().contains("正在更新"));
+            assertTrue(((JLabel)named(panel,"cart-total")).getText().contains("更新中"));
             panel.showState(state(buyer(),ClientController.CartStatus.UNCERTAIN,null,false,ClientController.Action.NONE));
             assertEquals(0,((Container)named(panel,"cart-cards")).getComponentCount());
-            assertEquals("",((JTextArea)named(panel,"cart-total")).getText());
+            assertEquals("",((JLabel)named(panel,"cart-total")).getText());
             assertTrue(named(panel,"refresh-cart").isEnabled());
         });
     }
@@ -96,7 +96,7 @@ class CartPanelTest {
             var oldRemove=(JButton)named(panel,"remove-cart-item-5");
             panel.showState(state(null,ClientController.CartStatus.GUEST,null,true,ClientController.Action.LOGOUT));
             assertEquals(0,((Container)named(panel,"cart-cards")).getComponentCount());
-            assertEquals("",((JTextArea)named(panel,"cart-total")).getText());
+            assertEquals("",((JLabel)named(panel,"cart-total")).getText());
             var b=new UserIdentity(2,"buyer_b","买家 B",UserIdentity.Role.BUYER);
             panel.showState(state(b,ClientController.CartStatus.READY,contents(),false,ClientController.Action.NONE));
             assertNotSame(oldQuantity,named(panel,"cart-quantity-5"));
@@ -115,7 +115,7 @@ class CartPanelTest {
             panel.showState(ready(contents()));
             panel.showState(ready(new CartSnapshot(2,List.of())));
             assertEquals(0,((Container)named(panel,"cart-cards")).getComponentCount());
-            assertTrue(((JTextArea)named(panel,"cart-total")).getText().contains("0.00"));
+            assertTrue(((JLabel)named(panel,"cart-total")).getText().contains("0.00"));
         });
     }
     @Test void authoritativeUpdatesNeverTriggerAnotherWriteAndProbeKeepsTheSameCard() throws Exception {
@@ -160,6 +160,17 @@ class CartPanelTest {
             ((JButton)named(panel,"remove-cart-item-9")).doClick();
             assertEquals(List.of("9:3","9:null"),edits);
             assertEquals(1,((JSpinner)named(panel,"cart-quantity-5")).getValue());
+        });
+    }
+    @Test void unknownCheckoutKeepsRecoveryControlsVisibleEvenWhenTheCartIsCleared() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var panel=new CartPanel(images);var base=state(buyer(),ClientController.CartStatus.UNCERTAIN,null,false,ClientController.Action.NONE);
+            var request=new cn.edu.jlu.wechatmerchant.protocol.CheckoutRequest(java.util.UUID.randomUUID().toString(),1,"a".repeat(64),null,List.of(5L));
+            var pending=new cn.edu.jlu.wechatmerchant.client.application.PendingCheckouts.Entry(request,List.of(5L));
+            var orders=new ClientController.OrdersState(null,null,pending,null,List.of(5L),List.of(5L),false,"结果待核对");
+            panel.showState(new ClientController.State(false,"",base.catalog(),buyer(),"",ClientController.Action.NONE,base.cart(),base.coupons(),orders));
+            Component control=named(panel,"query-pending");while(control!=null){assertTrue(control.isVisible());if(control==panel)break;control=control.getParent();}
+            assertFalse(named(panel,"prepare-checkout").isEnabled());
         });
     }
     private static Component named(Container parent,String name) {

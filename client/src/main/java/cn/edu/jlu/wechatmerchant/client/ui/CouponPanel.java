@@ -3,6 +3,7 @@ package cn.edu.jlu.wechatmerchant.client.ui;
 import cn.edu.jlu.wechatmerchant.client.application.ClientController;
 import cn.edu.jlu.wechatmerchant.protocol.CouponPage;
 import java.awt.*;
+import cn.edu.jlu.wechatmerchant.desktop.*;
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -14,7 +15,7 @@ final class CouponPanel extends JPanel {
     private static final long serialVersionUID=1L;
     private final DefaultListModel<CouponPage.Item> model=new DefaultListModel<>();
     private final JList<CouponPage.Item> list=new JList<>(model);
-    private final JButton available=new JButton("领券活动"),owned=new JButton("我的券"),reload=new JButton("刷新券列表"),previous=new JButton("上一页"),next=new JButton("下一页"),claim=new JButton("领取所选券"),use=new JButton("使用所选券"),none=new JButton("不用优惠券"),back=new JButton("返回购物车");
+    private final JButton available=new JButton("领券活动"),owned=new JButton("我的券"),reload=new JButton("刷新"),previous=new JButton("上一页"),next=new JButton("下一页"),claim=new JButton("领取"),use=new JButton("使用"),none=new JButton("不用券"),back=new JButton("返回购物车");
     private final JTextArea details=new JTextArea(5,45),message=new JTextArea(2,45);
     private CouponPage shown;
     private ClientController.State state;
@@ -29,10 +30,9 @@ final class CouponPanel extends JPanel {
         for(var b:new JButton[]{back,available,owned,reload,previous,next})tools.add(b);
         back.setName("coupon-back"); available.setName("coupon-available"); owned.setName("coupon-owned"); reload.setName("coupon-refresh"); previous.setName("buyer-coupon-previous");next.setName("buyer-coupon-next"); add(tools,BorderLayout.NORTH);
         list.setName("buyer-coupons"); list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setCellRenderer((owner,item,index,selected,focus) -> {
-            JLabel label=new JLabel(item.name()+" · "+terms(item)+" · "+ClientController.couponReason(item.status().name()));
-            label.putClientProperty("html.disable",true); label.setBorder(BorderFactory.createEmptyBorder(10,8,10,8)); label.setOpaque(true);
-            label.setBackground(selected?owner.getSelectionBackground():owner.getBackground()); label.setForeground(selected?owner.getSelectionForeground():owner.getForeground()); return label;
+        list.setFixedCellHeight(126);list.setOpaque(false);list.setCellRenderer((owner,item,index,chosen,focus) -> {
+            var card=new SurfacePanel(new BorderLayout(0,12));card.putClientProperty("theme.selected",chosen);card.add(Ui.row(Ui.label(item.name()),new StatusPill(ClientController.couponReason(item.status().name()),StatusPill.Tone.ACCENT)),BorderLayout.NORTH);
+            var money=Ui.label(terms(item));money.setFont(money.getFont().deriveFont(Font.BOLD,19f));card.add(money,BorderLayout.CENTER);card.add(Ui.caption("全店适用"),BorderLayout.SOUTH);return Ui.renderer(card,owner.getWidth(),126);
         });
         add(new JScrollPane(list),BorderLayout.CENTER);
         JPanel bottom=new JPanel(new BorderLayout(0,8));
@@ -60,7 +60,7 @@ final class CouponPanel extends JPanel {
             long selected=list.getSelectedValue()==null?0:list.getSelectedValue().couponId();shown=page;model.clear();
             if(page!=null){kind=page.kind();offset=page.offset();model.addAll(page.items());int chosen=0;for(int i=0;i<model.size();i++)if(selected>0 && model.get(i).couponId()==selected)chosen=i;if(!model.isEmpty())list.setSelectedIndex(chosen);}
         }
-        message.setText(value.identity()==null?"登录后查看本人优惠券":value.coupons().message());selection();
+        message.setText(value.identity()==null?"":value.coupons().message());message.setVisible(NoticeBar.important(message.getText()));selection();
     }
     private void selection() {
         boolean idle=state!=null && !state.busy() && state.canModifyCart();var item=list.getSelectedValue();

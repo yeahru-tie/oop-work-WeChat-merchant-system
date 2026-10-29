@@ -45,7 +45,7 @@ class CouponFlowIntegrationTest {
         MerchantClient client(int port){return new MerchantClient("127.0.0.1",port,1000,5000);}
         @Override public void close(){server.close();sessions.clear();}
     }
-    @Test void actualCartControlsClaimSelectRequoteRejectInvalidCouponAndClearOnLogout() throws Exception {
+    @Test void actualCartControlsClaimSelectRequoteAutoCancelInvalidCouponAndClearOnLogout() throws Exception {
         try(var f=new Fixture(folder.resolve("flow.db"))) {
             new CartService(f.db).add(1,1001,2,0);var image=ProductImages.load();var ref=new AtomicReference<CartPanel>();
             SwingUtilities.invokeAndWait(() -> ref.set(new CartPanel(image)));var queue=new LinkedBlockingQueue<ClientController.State>();
@@ -64,18 +64,16 @@ class CouponFlowIntegrationTest {
                 assertEquals("14200",applied.coupons().quote().payableCents().toString());
                 click(ref.get(),"coupon-back");long item=applied.cart().contents().items().getFirst().itemId();
                 SwingUtilities.invokeAndWait(() -> ((JSpinner)named(ref.get(),"cart-quantity-"+item)).setValue(1));
-                var under=await(queue,s -> !s.busy() && s.coupons().quote()!=null && "THRESHOLD_NOT_MET".equals(s.coupons().quote().couponStatus()));
-                assertNull(under.coupons().quote().payableCents());assertEquals(applied.coupons().selectedCoupon(),under.coupons().selectedCoupon());
-                SwingUtilities.invokeAndWait(() -> assertFalse(((JTextArea)named(ref.get(),"cart-total")).getText().contains("预估应付")));
-                click(ref.get(),"open-coupons");await(queue,s -> !s.busy() && s.coupons().page()!=null);click(ref.get(),"no-coupon");
-                var none=await(queue,s -> !s.busy() && s.coupons().quote()!=null && s.coupons().selectedCoupon()==null);assertEquals("8100",none.coupons().quote().payableCents().toString());
-                click(ref.get(),"coupon-back");SwingUtilities.invokeAndWait(() -> ((JSpinner)named(ref.get(),"cart-quantity-"+item)).setValue(2));
+                var under=await(queue,s -> !s.busy() && s.coupons().quote()!=null && s.coupons().selectedCoupon()==null && s.coupons().message().contains("门槛"));
+                assertEquals("8100",under.coupons().quote().payableCents().toString());
+                SwingUtilities.invokeAndWait(() -> {String total=((JLabel)named(ref.get(),"cart-total")).getText();assertEquals("¥ 81.00",total);assertTrue(((cn.edu.jlu.wechatmerchant.desktop.NoticeBar)named(ref.get(),"quote-notice")).getText().contains("自动取消"));});
+                SwingUtilities.invokeAndWait(() -> ((JSpinner)named(ref.get(),"cart-quantity-"+item)).setValue(2));
                 await(queue,s -> !s.busy() && s.coupons().quote()!=null && s.cart().contents().items().getFirst().quantity()==2);
                 click(ref.get(),"open-coupons");await(queue,s -> !s.busy() && s.coupons().page()!=null);click(ref.get(),"use-coupon");await(queue,s -> !s.busy() && s.coupons().selectedCoupon()!=null);
                 f.clock.advance(Duration.ofSeconds(10));SwingUtilities.invokeAndWait(controller::refreshCart);
-                var expired=await(queue,s -> !s.busy() && s.coupons().quote()!=null && "EXPIRED".equals(s.coupons().quote().couponStatus()));assertNull(expired.coupons().quote().payableCents());
+                var expired=await(queue,s -> !s.busy() && s.coupons().quote()!=null && s.coupons().selectedCoupon()==null && s.coupons().message().contains("已过期"));assertEquals("16200",expired.coupons().quote().payableCents().toString());
                 SwingUtilities.invokeAndWait(controller::logout);var guest=await(queue,s -> !s.busy() && s.identity()==null);assertNull(guest.coupons().quote());assertNull(guest.coupons().page());
-                SwingUtilities.invokeAndWait(() -> {assertEquals("",((JTextArea)named(ref.get(),"cart-total")).getText());assertEquals(0,((JList<?>)named(ref.get(),"buyer-coupons")).getModel().getSize());});
+                SwingUtilities.invokeAndWait(() -> {assertEquals("",((JLabel)named(ref.get(),"cart-total")).getText());assertEquals(0,((JList<?>)named(ref.get(),"buyer-coupons")).getModel().getSize());});
                 assertEquals(1,f.coupons.adminPage(f.admin,0).items().getFirst().claimed());
                 try(var c=f.db.openReadOnlyConnection();var s=c.createStatement();var r=s.executeQuery("SELECT used FROM user_coupons")){assertTrue(r.next());assertEquals(0,r.getInt(1));}
             }

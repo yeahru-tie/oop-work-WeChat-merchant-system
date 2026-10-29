@@ -30,16 +30,18 @@ public final class ClientWindow extends JFrame {
     private LoginDialog loginDialog;
     private ClientController.State shownState;
     private final CartPanel cart;
-    private final JTabbedPane navigation=new JTabbedPane();
+    private final cn.edu.jlu.wechatmerchant.desktop.NavigationPane navigation=new cn.edu.jlu.wechatmerchant.desktop.NavigationPane("微商系统");
     private BiConsumer<String,char[]> loginSubmit;
     private Runnable loginCancel;
     private Runnable cartRefresh;
     private boolean pendingCartLogin;
     private final OrdersPanel orders=new OrdersPanel();
+    private final InboxPanel inbox=new InboxPanel();
     private javax.swing.JDialog confirmationDialog;
     private QuoteSnapshot shownConfirmation;
     private Runnable confirmCheckout,cancelCheckout;
     private boolean pendingOrdersLogin;
+    private boolean relatedNavigation;
 
     public ClientWindow(ProductImages images) {
         super("微商系统 · 买家端");
@@ -48,41 +50,27 @@ public final class ClientWindow extends JFrame {
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setMinimumSize(new Dimension(800, 640));
 
-        JPanel content = new JPanel(new BorderLayout(0, 18));
-        content.setBorder(BorderFactory.createEmptyBorder(20, 24, 16, 24));
-
-        JLabel heading = new JLabel("微商系统");
-        heading.setFont(heading.getFont().deriveFont(Font.BOLD, 24f));
-        JPanel header = new JPanel(new BorderLayout());
-        header.add(heading, BorderLayout.WEST);
-        JPanel identityBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        identity.putClientProperty("html.disable", Boolean.TRUE);
-        authStatus.putClientProperty("html.disable", Boolean.TRUE);
-        identityBar.add(identity);
-        identityBar.add(login);
-        header.add(identityBar, BorderLayout.EAST);
-        content.add(header, BorderLayout.NORTH);
-
         navigation.addTab("商品", products);
         navigation.addTab("购物车", cart);
         navigation.addTab("我的订单", orders);
-        navigation.addTab("消息", unavailablePage("订单通知与优惠公告功能尚未开放。"));
-        navigation.addTab("设置", unavailablePage("主题设置功能尚未开放。"));
-        content.add(navigation, BorderLayout.CENTER);
-        JPanel connectionBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        connectionBar.add(new JLabel("连接测试："));
-        connectionBar.add(connectionStatus);
-        connectionBar.add(testConnection);
-        connectionBar.add(cancelConnection);
-        testConnection.setEnabled(false);
-        cancelConnection.setEnabled(false);
-        JPanel footer = new JPanel(new GridLayout(0, 1, 0, 6));
-        footer.add(authStatus);
-        footer.add(connectionBar);
-        content.add(footer, BorderLayout.SOUTH);
-
+        navigation.addTab("消息", inbox);
+        var settings=new JPanel(new BorderLayout(0,24));
+        settings.add(new cn.edu.jlu.wechatmerchant.desktop.ThemeSettingsPanel(),BorderLayout.CENTER);
+        var connectionCard=new cn.edu.jlu.wechatmerchant.desktop.SurfacePanel(new BorderLayout(16,16));
+        connectionCard.add(cn.edu.jlu.wechatmerchant.desktop.Ui.label("服务连接"),BorderLayout.NORTH);
+        connectionCard.add(connectionStatus,BorderLayout.CENTER);
+        testConnection.setText("检测连接");
+        connectionCard.add(cn.edu.jlu.wechatmerchant.desktop.Ui.row(testConnection,cancelConnection),BorderLayout.SOUTH);
+        settings.add(connectionCard,BorderLayout.SOUTH);navigation.addTab("设置",settings);
+        identity.putClientProperty("html.disable",true);authStatus.putClientProperty("html.disable",true);
+        navigation.accountArea().add(identity);navigation.accountArea().add(login);
+        testConnection.setEnabled(false);cancelConnection.setVisible(false);
+        var content=new JPanel(new BorderLayout());content.add(navigation,BorderLayout.CENTER);
+        authStatus.setBorder(BorderFactory.createEmptyBorder(10,24,10,24));authStatus.setVisible(false);content.add(authStatus,BorderLayout.SOUTH);
         setContentPane(content);
-        setSize(960, 800);
+        var screen=java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+        setMinimumSize(new Dimension(Math.min(960,screen.width-32),Math.min(680,screen.height-32)));
+        setSize(Math.min(1280,screen.width-40),Math.min(880,screen.height-40));
         setLocationRelativeTo(null);
     }
 
@@ -132,17 +120,20 @@ public final class ClientWindow extends JFrame {
     public void bindOrderActions(java.util.function.BiConsumer<Long,Boolean> select,Runnable prepare,Runnable confirm,Runnable cancel,
             java.util.function.IntConsumer list,java.util.function.LongConsumer detail,Runnable query,Runnable retry){
         confirmCheckout=confirm;cancelCheckout=cancel;cart.bindCheckoutActions(select,prepare,query,retry);orders.bind(this::openLogin,list,detail,query,retry);
-        navigation.addChangeListener(event -> {if(navigation.getSelectedIndex()!=2 || shownState==null){pendingOrdersLogin=false;return;}if(shownState.identity()==null){if(shownState.busy())pendingOrdersLogin=true;else openLogin();}else if(!shownState.busy())list.accept(0);});
+        navigation.addChangeListener(event -> {if(relatedNavigation)return;if(navigation.getSelectedIndex()!=2 || shownState==null){pendingOrdersLogin=false;return;}if(shownState.identity()==null){if(shownState.busy())pendingOrdersLogin=true;else openLogin();}else if(!shownState.busy())list.accept(0);});
     }
 
     public void showState(ClientController.State state) {
         shownState = state;
         connectionStatus.setText(state.connectionMessage());
         testConnection.setEnabled(!state.busy());
-        cancelConnection.setEnabled(state.busy());
+        cancelConnection.setEnabled(state.canCancel());cancelConnection.setVisible(state.canCancel());
         products.showState(state);
         cart.showState(state);
         orders.showState(state);
+        inbox.showState(state);
+        long unread=state.identity()==null || state.inbox().page()==null?0:state.inbox().page().unreadCount();
+        navigation.setTitleAt(3,unread==0?"消息":"消息 · "+(unread>99?"99+":unread));
         QuoteSnapshot confirmation=state.identity()==null?null:state.orders().confirmation();
         if(confirmation==null && confirmationDialog!=null){confirmationDialog.dispose();confirmationDialog=null;shownConfirmation=null;}
         if(confirmation!=null && confirmation!=shownConfirmation && confirmCheckout!=null){
@@ -155,9 +146,9 @@ public final class ClientWindow extends JFrame {
             });
         }
         identity.setText(state.identity() == null ? "游客" : state.identity().displayName());
-        authStatus.setText(state.authMessage());
+        authStatus.setText(state.authMessage());authStatus.setVisible(cn.edu.jlu.wechatmerchant.desktop.NoticeBar.important(state.authMessage()));
         login.setText(state.identity() == null ? "登录" : "退出登录");
-        login.setEnabled(!state.busy());
+        login.setEnabled(!state.busy());login.putClientProperty("theme.primary",state.identity()==null);login.putClientProperty("theme.ghost",state.identity()!=null);
         if (loginDialog != null && loginDialog.isDisplayable()) {
             if (state.identity() != null) loginDialog.dispose();
             else loginDialog.showProgress(state.action() == ClientController.Action.LOGIN, state.authMessage());
@@ -174,6 +165,11 @@ public final class ClientWindow extends JFrame {
             });
         }
         if(pendingOrdersLogin && !state.busy() && state.identity()==null && navigation.getSelectedIndex()==2){pendingOrdersLogin=false;SwingUtilities.invokeLater(() -> {if(shownState==state && navigation.getSelectedIndex()==2)openLogin();});}
+    }
+    public void bindReturnActions(java.util.function.BiConsumer<Long,String> submit,java.util.function.IntConsumer history,Runnable query,Runnable retry){orders.bindReturns(submit,history,query,retry);}
+    public void bindMessageActions(java.util.function.BiConsumer<Integer,Long> query,java.util.function.LongConsumer order,java.util.function.LongConsumer product){
+        inbox.bind(query,id -> {relatedNavigation=true;try{navigation.setSelectedIndex(2);}finally{relatedNavigation=false;}order.accept(id);},id -> {navigation.setSelectedIndex(0);products.focusProduct(id);product.accept(id);},this::openLogin);
+        navigation.addChangeListener(e -> {if(navigation.getSelectedIndex()==3 && shownState!=null && !shownState.busy()){if(shownState.identity()==null)openLogin();else query.accept(0,null);}});
     }
 
     private static JPanel unavailablePage(String message) {

@@ -54,7 +54,7 @@ class ProductListPanelTest {
     }
 
     @Test
-    void selectionSurvivesProbeAndFailedOrEmptyQueriesDoNotLeaveStaleProducts() throws Exception {
+    void cardInputsSurviveProbeAndFailedOrEmptyQueriesDoNotLeaveStaleProducts() throws Exception {
         ProductImages images = ProductImages.load();
         SwingUtilities.invokeAndWait(() -> {
             ProductListPanel panel = new ProductListPanel(images);
@@ -63,26 +63,26 @@ class ProductListPanelTest {
             var catalog = new CatalogState(CatalogStatus.READY,
                     new ProductPage(List.of(first, second), 20, 20, false), 20, "已加载本页 2 件商品");
             panel.showState(new State(false, "尚未测试连接", catalog));
-            JList<?> list = (JList<?>) named(panel, "product-list");
-            JTextArea description = (JTextArea) named(panel, "product-description");
-            assertEquals(2, list.getModel().getSize());
-            list.setSelectedIndex(1);
+            Container grid = (Container) named(panel, "product-cards");
+            Container secondCard = (Container) named(panel, "product-card-1002");
+            JTextArea description = (JTextArea) named(secondCard, "product-description");
+            var quantity=(javax.swing.JSpinner)named(secondCard,"product-quantity");quantity.setValue(4);
+            assertEquals(2, grid.getComponentCount());
             assertEquals(second.description(), description.getText());
             panel.showState(new State(true, "正在测试连接…", catalog));
-            assertEquals(1, list.getSelectedIndex());
+            assertSame(secondCard,named(panel,"product-card-1002"));assertEquals(4,quantity.getValue());
             assertFalse(named(panel, "refresh-products").isEnabled());
             assertFalse(named(panel, "previous-products").isEnabled());
             panel.showState(new State(false, "通信测试通过",
                     new CatalogState(CatalogStatus.ERROR, null, 20, "商品查询失败")));
-            assertEquals(0, list.getModel().getSize());
-            assertEquals("", description.getText());
+            assertNull(find(panel,"product-card-1002"));
             assertTrue(named(panel, "refresh-products").isEnabled());
             assertTrue(named(panel, "previous-products").isEnabled());
             assertFalse(named(panel, "next-products").isEnabled());
             assertTrue(labels(panel).stream().anyMatch(label -> "商品查询失败".equals(label.getText())));
             panel.showState(new State(false, "通信测试通过", new CatalogState(CatalogStatus.EMPTY,
                     new ProductPage(List.of(), 20, 0, false), 0, "暂无商品")));
-            assertEquals(0, list.getModel().getSize());
+            assertNull(find(panel,"product-card-1001"));
             assertFalse(named(panel, "previous-products").isEnabled());
             assertTrue(labels(panel).stream().anyMatch(label -> "暂无商品".equals(label.getText())));
         });

@@ -22,6 +22,7 @@ if (-not (Test-Path -LiteralPath $applicationJar -PathType Leaf)) {
 }
 
 $javaArguments = @()
+$javaArguments += ('-Dmerchant.themeFile=' + (Join-Path $repositoryRoot ('data/' + $App + '-theme.txt')))
 if ($App -eq 'server') {
     $resolvedDatabase = if ($PSBoundParameters.ContainsKey('DatabasePath')) { $DatabasePath } else { 'data/merchant.db' }
     if (-not [IO.Path]::IsPathRooted($resolvedDatabase)) {

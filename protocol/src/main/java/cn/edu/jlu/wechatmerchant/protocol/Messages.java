@@ -21,6 +21,10 @@ public final class Messages {
     public static final int CLAIM_COUPON = 1014;
     public static final int CHECKOUT = 1003;
     public static final int QUERY_ORDERS = 1010;
+    public static final int APPLY_RETURN = 1004;
+    public static final int QUERY_RETURNS = 1015;
+    public static final int LIST_MESSAGES = 1016;
+    public static final int READ_MESSAGE = 1017;
 
     public record Request(int version, String requestId, int operation, JsonObject body, String sessionToken) {
         @Override

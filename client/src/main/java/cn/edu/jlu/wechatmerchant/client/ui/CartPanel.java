@@ -4,6 +4,7 @@ import cn.edu.jlu.wechatmerchant.client.application.ClientController;
 import cn.edu.jlu.wechatmerchant.protocol.CartSnapshot;
 import cn.edu.jlu.wechatmerchant.protocol.CartSelection;
 import cn.edu.jlu.wechatmerchant.protocol.UserIdentity;
+import cn.edu.jlu.wechatmerchant.desktop.*;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -41,7 +42,10 @@ final class CartPanel extends JPanel {
     private final JPanel views = new JPanel(viewLayout);
     private final JLabel empty = label("登录后查看和保存自己的购物车");
     private final JLabel status = label("登录后查看和保存自己的购物车");
-    private final JTextArea total = new JTextArea(5, 24);
+    private final JLabel total=Ui.label("—"),original=Ui.label("—"),reduction=Ui.label("—"),couponAmount=Ui.label("—"),selectedCount=Ui.label("");
+    private final JPanel reductionRow=Ui.valueRow("商品优惠",reduction),couponRow=Ui.valueRow("优惠券",couponAmount);
+    private final SurfacePanel summary=new SurfacePanel(new BorderLayout(0,24));
+    private final NoticeBar quoteNotice=new NoticeBar(),cartNotice=new NoticeBar();
     private final JButton login = new JButton("登录查看购物车");
     private final JButton refresh = new JButton("刷新购物车");
     private final JButton coupons = new JButton("领券/选券");
@@ -50,7 +54,7 @@ final class CartPanel extends JPanel {
     private final javax.swing.Timer quoteClock=new javax.swing.Timer(1000,event -> showTotals());
     private boolean couponOpen;
     private final JButton checkout=new JButton("确认模拟成交"),queryPending=new JButton("核对本次结果"),retryPending=new JButton("原键重试本次");
-    private final JTextArea checkoutStatus=new JTextArea(2,24);
+    private final NoticeBar checkoutStatus=new NoticeBar();
     private java.util.function.BiConsumer<Long,Boolean> selectItem;
     private ClientController.State state;
     private UserIdentity owner;
@@ -60,41 +64,21 @@ final class CartPanel extends JPanel {
     CartPanel(ProductImages images) {
         super(new BorderLayout(0, 12));
         this.images = images;
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-        JPanel heading = new JPanel(new BorderLayout());
-        heading.add(status, BorderLayout.CENTER);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        login.setName("cart-login");
-        refresh.setName("refresh-cart");
-        actions.add(login);
-        actions.add(refresh);
-        coupons.setName("open-coupons");quoteRefresh.setName("refresh-quote");actions.add(coupons);actions.add(quoteRefresh);
-        heading.add(actions, BorderLayout.EAST);
-        add(heading, BorderLayout.NORTH);
-
-        grid.setName("cart-cards");
-        JScrollPane scroll = new JScrollPane(grid);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        views.add(scroll, "cards");
-        JPanel emptyPage = new JPanel(new BorderLayout());
-        empty.setHorizontalAlignment(JLabel.CENTER);
-        emptyPage.add(empty, BorderLayout.CENTER);
-        views.add(emptyPage, "empty");
-        views.add(couponPanel,"coupons");
-        viewLayout.show(views, "empty");
-        add(views, BorderLayout.CENTER);
-
-        JPanel footer = new JPanel(new BorderLayout(0, 6));
-        total.setName("cart-total");
-        configureText(total);
-        footer.add(total,BorderLayout.NORTH);
-        JTextArea hint=new JTextArea("加入购物车不占库存；确认模拟成交后才扣库存和核销所选券。预估不锁价。",2,24);
-        configureText(hint);
-        footer.add(hint,BorderLayout.CENTER);
-        JPanel settlement=new JPanel(new BorderLayout(0,5));configureText(checkoutStatus);checkoutStatus.setName("checkout-status");settlement.add(checkoutStatus,BorderLayout.CENTER);
-        JPanel settlementActions=new JPanel(new FlowLayout(FlowLayout.RIGHT));checkout.setName("prepare-checkout");queryPending.setName("query-pending");retryPending.setName("retry-pending");settlementActions.add(checkout);settlementActions.add(queryPending);settlementActions.add(retryPending);settlement.add(settlementActions,BorderLayout.SOUTH);footer.add(settlement,BorderLayout.SOUTH);
-        add(footer, BorderLayout.SOUTH);
+        JPanel heading=new JPanel(new BorderLayout(16,0));status.setFont(status.getFont().deriveFont(Font.BOLD,16f));heading.add(status,BorderLayout.WEST);
+        refresh.setText("刷新");refresh.setName("refresh-cart");login.setName("cart-login");
+        heading.add(Ui.row(refresh,Ui.help("加入购物车不占用库存。数量修改自动保存；输入后按回车。结算前会再次确认最终金额。")),BorderLayout.EAST);add(heading,BorderLayout.NORTH);
+        grid.setName("cart-cards");views.add(Ui.scroll(grid),"cards");
+        var emptyPage=new JPanel(new java.awt.GridBagLayout());emptyPage.setOpaque(false);empty.setFont(empty.getFont().deriveFont(Font.BOLD,18f));emptyPage.add(Ui.stack(24,empty,login));views.add(emptyPage,"empty");views.add(couponPanel,"coupons");
+        total.setName("cart-total");total.setFont(total.getFont().deriveFont(Font.BOLD,30f));total.putClientProperty("theme.accent",true);total.setForeground(Theme.accent());
+        quoteNotice.setName("quote-notice");var details=Ui.stack(20,Ui.title("结算明细"),selectedCount,Ui.valueRow("商品金额",original),reductionRow,couponRow,Ui.caption("预估应付"),total);summary.add(details,BorderLayout.NORTH);
+        coupons.setText("选择优惠券");coupons.setName("open-coupons");quoteRefresh.setText("更新报价");quoteRefresh.setName("refresh-quote");quoteRefresh.putClientProperty("theme.ghost",true);
+        checkout.setText("去结算");checkout.setName("prepare-checkout");Theme.primary(checkout);queryPending.setName("query-pending");retryPending.setName("retry-pending");checkoutStatus.setName("checkout-status");
+        var footer=Ui.stack(12,coupons,quoteRefresh,quoteNotice,checkout,queryPending,retryPending,checkoutStatus);summary.add(footer,BorderLayout.SOUTH);summary.setPreferredSize(null);
+        var side=new JPanel(new BorderLayout());side.setOpaque(false);side.add(summary,BorderLayout.NORTH);side.setPreferredSize(new Dimension(292,0));
+        var workspace=new JPanel(new BorderLayout(24,24)){
+            private boolean narrow;
+            @Override public void doLayout(){boolean next=getWidth()<720;if(next!=narrow){narrow=next;remove(side);add(side,narrow?BorderLayout.SOUTH:BorderLayout.EAST);summary.remove(details);summary.remove(footer);summary.add(details,narrow?BorderLayout.WEST:BorderLayout.NORTH);summary.add(footer,narrow?BorderLayout.EAST:BorderLayout.SOUTH);summary.setPreferredSize(null);side.setPreferredSize(new Dimension(292,narrow?Math.max(details.getPreferredSize().height,footer.getPreferredSize().height)+48:0));}super.doLayout();}
+        };workspace.setOpaque(false);workspace.add(views,BorderLayout.CENTER);workspace.add(side,BorderLayout.EAST);add(workspace,BorderLayout.CENTER);cartNotice.setName("cart-notice");add(cartNotice,BorderLayout.SOUTH);
         updateActions();
     }
     void bindCheckoutActions(java.util.function.BiConsumer<Long,Boolean> select,Runnable prepare,Runnable query,Runnable retry){this.selectItem=select;checkout.addActionListener(e -> prepare.run());queryPending.addActionListener(e -> query.run());retryPending.addActionListener(e -> retry.run());updateActions();}
@@ -128,12 +112,13 @@ final class CartPanel extends JPanel {
         owner = next.identity();
         if (incoming != null) display(incoming);
         else if (!saving) clearCards();
-        status.setText(next.cart().message());
+        status.setText(incoming==null?next.identity()==null?"":"正在同步购物车":incoming.items().isEmpty()?"":"共 "+incoming.items().size()+" 种商品");
+        cartNotice.showMessage(NoticeBar.important(next.cart().message())?next.cart().message():"");
         couponPanel.showState(next);
         showTotals();
         if(couponOpen && next.identity()!=null) viewLayout.show(views,"coupons");
         else if (cards.isEmpty()) {
-            empty.setText(incoming != null ? "购物车为空，去商品页挑选商品吧" : next.cart().message());
+            empty.setText(next.identity()==null?"登录后查看购物车":incoming!=null?"购物车还是空的":next.busy()?"正在加载购物车…":"请刷新购物车");
             viewLayout.show(views, "empty");
         } else {
             viewLayout.show(views, "cards");
@@ -142,17 +127,15 @@ final class CartPanel extends JPanel {
     }
 
     private void showTotals() {
-        if(state==null || displayed==null){total.setText("");return;}
-        boolean saving=state.busy() && state.action()==ClientController.Action.CART_WRITE;
-        var selected=CartSelection.select(displayed,state.selectedIds());
-        String text="已选原价合计："+money(selected.totalCents())+"\n商品优惠："+money(selected.totalCents().subtract(selected.estimatedTotalCents()));
-        var coupon=state.coupons();
-        if(!coupon.active())text+="\n预估合计："+money(selected.estimatedTotalCents())+(saving?"（正在更新）":"");
-        else if(state.busy() || coupon.quote()==null || !coupon.fresh())text+="\n券后报价：待刷新报价或重新选券";
-        else if(!coupon.quote().ready())text+="\n券后报价：所选券不可用，请重选或明确不用";
-        else text+="\n优惠券抵扣："+money(coupon.quote().couponReductionCents())+"\n预估应付："+money(coupon.quote().payableCents());
-        if(coupon.active())text+="\n"+(coupon.quote()!=null && !coupon.fresh()?"活动时间边界已到，请刷新报价核对":coupon.message());
-        total.setText(text);total.setCaretPosition(0);
+        if(state==null || displayed==null){total.setText("");original.setText("");reduction.setText("");couponAmount.setText("");selectedCount.setText("");quoteNotice.showMessage("");return;}
+        var selected=CartSelection.select(displayed,state.selectedIds());var savings=selected.totalCents().subtract(selected.estimatedTotalCents());
+        selectedCount.setText("已选 "+selected.items().size()+" 种商品");original.setText(money(selected.totalCents()));reduction.setText("− "+money(savings));reductionRow.setVisible(savings.signum()>0);
+        var coupon=state.coupons();couponRow.setVisible(false);String warning="";
+        if(!coupon.active())total.setText(money(selected.estimatedTotalCents()));
+        else if(state.busy() || coupon.quote()==null || !coupon.fresh()){total.setText("—");warning=state.busy()?"正在更新金额…":"报价已失效，请更新";}
+        else if(!coupon.quote().ready()){total.setText("—");warning=coupon.quote().itemIds().isEmpty()?"请选择商品":"优惠券不可用，请更新报价";}
+        else{total.setText(money(coupon.quote().payableCents()));couponAmount.setText("− "+money(coupon.quote().couponReductionCents()));couponRow.setVisible(coupon.quote().couponReductionCents().signum()>0);}
+        if(state.busy() && state.action()==ClientController.Action.CART_WRITE)total.setText("更新中…");if(NoticeBar.important(coupon.message()))warning=coupon.message();quoteNotice.showMessage(warning);
     }
     @Override public void addNotify(){super.addNotify();quoteClock.start();}
     @Override public void removeNotify(){quoteClock.stop();super.removeNotify();}
@@ -185,14 +168,15 @@ final class CartPanel extends JPanel {
     private void updateActions() {
         boolean guest = state == null || state.identity() == null;
         boolean busy = state != null && state.busy();
-        login.setVisible(guest);
+        login.setVisible(guest);summary.setVisible(!guest && (displayed!=null && !displayed.items().isEmpty() || state.orders().pending()!=null || state.orders().storageBlocked()));
         login.setEnabled(!busy);
         refresh.setEnabled(!guest && !busy);
         coupons.setEnabled(!busy && (guest || state.canModifyCart()));
         quoteRefresh.setEnabled(!guest && !busy && state.canModifyCart());
         boolean pending=!guest && state.orders().pending()!=null;
         checkout.setEnabled(selectItem!=null && state!=null && state.canModifyCart() && !state.selectedIds().isEmpty());queryPending.setVisible(pending);retryPending.setVisible(pending);queryPending.setEnabled(pending && !busy);retryPending.setEnabled(pending && !busy);
-        checkoutStatus.setText(guest?"":state.orders().message().equals("尚无订单数据")?"勾选商品后，可核对金额并二次确认模拟成交":state.orders().message());
+        String trade=guest?"":state.orders().message();
+        checkoutStatus.showMessage(!guest && (pending || state.orders().storageBlocked() || NoticeBar.important(trade)) && !trade.equals("尚无订单数据")?trade:"");
         for (ItemCard card : cards.values()) card.setEditable(canEdit(card));
     }
 
@@ -210,7 +194,7 @@ final class CartPanel extends JPanel {
         return result;
     }
 
-    private final class ItemCard extends JPanel {
+    private final class ItemCard extends cn.edu.jlu.wechatmerchant.desktop.SurfacePanel {
         private static final long serialVersionUID = 1L;
         private final JLabel picture = new JLabel();
         private final JTextArea name = new JTextArea(2, 14);
@@ -228,60 +212,15 @@ final class CartPanel extends JPanel {
         ItemCard(CartSnapshot.Item item) {
             super(new BorderLayout(0, 10));
             setName("cart-item-" + item.itemId());
-            setBackground(Color.WHITE);
-            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(new Color(221, 227, 233), 1, true),
-                    BorderFactory.createEmptyBorder(14, 14, 14, 14)));
-            JPanel top = new JPanel(new BorderLayout(12, 0));
-            top.setOpaque(false);
-            picture.setPreferredSize(new Dimension(88, 88));
-            top.add(picture, BorderLayout.WEST);
-            JPanel title = new JPanel(new BorderLayout(0, 4));
-            title.setOpaque(false);
-            configureText(name);
-            name.setName("cart-name-" + item.itemId());
-            name.setFont(name.getFont().deriveFont(Font.BOLD, 16f));
-            title.add(name, BorderLayout.CENTER);
-            imageNote.setFont(imageNote.getFont().deriveFont(12f));
-            imageNote.setForeground(new Color(95, 104, 116));
-            title.add(imageNote, BorderLayout.SOUTH);
-            top.add(title, BorderLayout.CENTER);
-            selected.setOpaque(false);selected.setName("cart-selected-"+item.itemId());top.add(selected,BorderLayout.SOUTH);
-            add(top, BorderLayout.NORTH);
-            JPanel facts = new JPanel();
-            facts.setLayout(new javax.swing.BoxLayout(facts,javax.swing.BoxLayout.Y_AXIS));
-            facts.setOpaque(false);
-            facts.add(price);
-            facts.add(javax.swing.Box.createVerticalStrut(4));
-            facts.add(stock);
-            facts.add(javax.swing.Box.createVerticalStrut(4));
-            configureText(promotion);
-            promotion.setName("cart-promotion-"+item.itemId());
-            facts.add(promotion);
-            facts.add(javax.swing.Box.createVerticalStrut(4));
-            configureText(subtotal);
-            subtotal.setName("cart-subtotal-" + item.itemId());
-            subtotal.setFont(subtotal.getFont().deriveFont(Font.BOLD, 15f));
-            facts.add(subtotal);
-            add(facts, BorderLayout.CENTER);
-            JPanel bottom = new JPanel(new BorderLayout(0, 5));
-            bottom.setOpaque(false);
-            JPanel controls = new JPanel(new BorderLayout(8, 0));
-            controls.setOpaque(false);
-            JPanel amount = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-            amount.setOpaque(false);
-            amount.add(label("数量"));
-            quantity.setName("cart-quantity-" + item.itemId());
-            quantity.setPreferredSize(new Dimension(104, 28));
-            amount.add(quantity);
-            controls.add(amount, BorderLayout.WEST);
-            remove.setName("remove-cart-item-" + item.itemId());
-            controls.add(remove, BorderLayout.EAST);
-            bottom.add(controls, BorderLayout.NORTH);
-            JLabel hint = label("数量改后自动保存，输入后按回车");
-            hint.setFont(hint.getFont().deriveFont(12f));
-            hint.setForeground(new Color(95, 104, 116));
-            bottom.add(hint, BorderLayout.SOUTH);
-            add(bottom, BorderLayout.SOUTH);
+            selected.setText("");selected.setOpaque(false);selected.setName("cart-selected-"+item.itemId());selected.setToolTipText("参与本次结算");selected.getAccessibleContext().setAccessibleName("勾选商品");
+            remove.setName("remove-cart-item-"+item.itemId());remove.putClientProperty("theme.ghost",true);
+            var header=new JPanel(new BorderLayout());header.setOpaque(false);header.add(Ui.row(selected,imageNote),BorderLayout.WEST);header.add(remove,BorderLayout.EAST);add(header,BorderLayout.NORTH);
+            var top=new JPanel(new BorderLayout(20,0));top.setOpaque(false);picture.setPreferredSize(new Dimension(88,88));top.add(picture,BorderLayout.WEST);
+            configureText(name);name.setName("cart-name-"+item.itemId());name.setFont(name.getFont().deriveFont(Font.BOLD,17f));Theme.muted(stock);Theme.muted(imageNote);imageNote.setFont(imageNote.getFont().deriveFont(12f));
+            price.setFont(price.getFont().deriveFont(Font.BOLD,16f));top.add(Ui.stack(8,name,price,stock),BorderLayout.CENTER);add(top,BorderLayout.CENTER);
+            var bottom=new JPanel(new BorderLayout(12,12));bottom.setOpaque(false);quantity.setName("cart-quantity-"+item.itemId());quantity.setPreferredSize(new Dimension(132,42));quantity.setToolTipText("数量自动保存；输入后按回车");bottom.add(quantity,BorderLayout.WEST);
+            configureText(subtotal);subtotal.setRows(1);subtotal.setColumns(7);subtotal.setName("cart-subtotal-"+item.itemId());subtotal.setFont(subtotal.getFont().deriveFont(Font.BOLD,18f));
+            configureText(promotion);promotion.setRows(1);promotion.setName("cart-promotion-"+item.itemId());Theme.muted(promotion);bottom.add(subtotal,BorderLayout.EAST);bottom.add(promotion,BorderLayout.SOUTH);add(bottom,BorderLayout.SOUTH);
 
             quantity.addChangeListener(event -> {
                 if (!updating && canEdit(this) && !quantity.getValue().equals(this.item.quantity())) {
@@ -310,12 +249,12 @@ final class CartPanel extends JPanel {
                 picture.setIcon(pictures.thumbnail());
                 name.setText(next.name());
                 name.setCaretPosition(0);
-                imageNote.setText(pictures.demo() ? "AI 生成演示图" : "暂无商品图片");
-                price.setText("当前单价：" + money(BigInteger.valueOf(next.priceCents())));
-                stock.setText("当前库存：" + next.stock() + (next.quantity() > next.stock() ? " 件（库存不足）" : " 件"));
+                imageNote.setText(pictures.demo() ? "AI演示图" : "暂无图片");
+                price.setText(money(next.estimatedCents().divide(BigInteger.valueOf(next.quantity())))+" / 件");
+                stock.setText(next.quantity()>next.stock()?"库存不足":"剩余 "+next.stock()+" 件");
                 stock.setForeground(next.quantity() > next.stock() ? new Color(168, 62, 30) : getForeground());
-                promotion.setText(PromotionText.details(next.promotion(),next.quantity()));
-                subtotal.setText("原价小计：" + money(next.subtotalCents())+"\n预估小计："+money(next.estimatedCents()));
+                var savings=next.subtotalCents().subtract(next.estimatedCents());promotion.setText(savings.signum()>0?"已优惠 "+money(savings):"");promotion.setVisible(savings.signum()>0);promotion.setToolTipText(PromotionText.details(next.promotion(),next.quantity()));
+                subtotal.setText(money(next.estimatedCents()));
                 subtotal.setCaretPosition(0);
                 quantity.setValue(next.quantity());
             } finally {
@@ -352,7 +291,7 @@ final class CartPanel extends JPanel {
     /** Tracks viewport width and lays out complete cards in one to three columns. */
     private static final class CardGrid extends JPanel implements Scrollable {
         private static final long serialVersionUID = 1L;
-        private static final int GAP = 14;
+        private static final int GAP = 24;
         CardGrid() { setLayout(null); }
         private int columns() { return Math.max(1, Math.min(3, (getWidth() + GAP) / (300 + GAP))); }
         private int rowHeight() {

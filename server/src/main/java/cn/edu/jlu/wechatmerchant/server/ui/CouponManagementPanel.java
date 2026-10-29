@@ -3,6 +3,7 @@ package cn.edu.jlu.wechatmerchant.server.ui;
 import cn.edu.jlu.wechatmerchant.server.application.*;
 import cn.edu.jlu.wechatmerchant.server.domain.promotion.CouponCampaign;
 import java.awt.*;
+import cn.edu.jlu.wechatmerchant.desktop.*;
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.*;
@@ -27,34 +28,31 @@ public final class CouponManagementPanel extends JPanel implements AutoCloseable
     private boolean busy,filling,dirty,needsReload,hasMore;
     private int offset;
     public CouponManagementPanel(CouponService service,Supplier<String> token,Runnable denied) {
-        super(new BorderLayout(12,12)); setBorder(BorderFactory.createEmptyBorder(12,12,12,12));
+        super(new BorderLayout(12,12)); setOpaque(false);
         controller=new CouponManagementController(service,token,this::showStatus,denied);
         JPanel toolbar=new JPanel(new FlowLayout(FlowLayout.LEFT));
         for(var button:new JButton[]{create,previous,next,reload})toolbar.add(button);
         create.setName("coupon-new"); previous.setName("coupon-previous"); next.setName("coupon-next"); reload.setName("coupon-reload");
         add(toolbar,BorderLayout.NORTH);
         list.setName("coupon-campaigns"); list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setCellRenderer((owner,value,index,selected,focus) -> {
-            JLabel label=new JLabel(value.campaignId()+" · "+value.name()+" / "+(value.published()?(value.paused()?"暂停领取":"已发布"):"草稿"));
-            label.putClientProperty("html.disable",true); label.setOpaque(true); label.setBorder(BorderFactory.createEmptyBorder(8,6,8,6));
-            label.setBackground(selected?owner.getSelectionBackground():owner.getBackground()); label.setForeground(selected?owner.getSelectionForeground():owner.getForeground()); return label;
+        list.setFixedCellHeight(124);list.setOpaque(false);list.setCellRenderer((owner,value,index,chosen,focus) -> {
+            var card=new SurfacePanel(new BorderLayout(0,12));card.putClientProperty("theme.selected",chosen);card.add(Ui.label(value.name()),BorderLayout.NORTH);card.add(Ui.label("减 ¥ "+BigDecimal.valueOf(value.discountCents(),2)),BorderLayout.CENTER);card.add(new StatusPill(value.published()?(value.paused()?"已暂停":"已发布"):"草稿",StatusPill.Tone.ACCENT),BorderLayout.SOUTH);return Ui.renderer(card,owner.getWidth(),124);
         });
-        JPanel fields=new JPanel(new GridLayout(0,2,10,10));
-        field(fields,"券名称（1—80字符）",name,"coupon-name");
-        field(fields,"满多少元可用（0为无门槛）",threshold,"coupon-threshold");
-        field(fields,"减免金额（元，须大于0）",discount,"coupon-discount");
-        field(fields,"开始（北京时间 年-月-日 时:分:秒）",start,"coupon-start");
-        field(fields,"结束（到达此刻不可领/用）",end,"coupon-end");
-        total.setName("coupon-total"); fields.add(new JLabel("发放总量（每人每种限领1张）")); fields.add(total);
-        JPanel editorPanel=new JPanel(new BorderLayout(0,16)); details.putClientProperty("html.disable",true); editorPanel.add(details,BorderLayout.NORTH);
+        JPanel fields=new JPanel(new GridLayout(0,2,24,24));
+        field(fields,"名称",name,"coupon-name");
+        field(fields,"使用门槛 / 元",threshold,"coupon-threshold");
+        field(fields,"减免金额 / 元",discount,"coupon-discount");
+        field(fields,"开始时间",start,"coupon-start");
+        field(fields,"结束时间",end,"coupon-end");
+        total.setName("coupon-total"); fields.add(Ui.field("发放总量",total,"每个买家每种券限领一张"));
+        fields.setOpaque(false);SurfacePanel editorPanel=new SurfacePanel(new BorderLayout(0,24)); details.putClientProperty("html.disable",true); editorPanel.add(details,BorderLayout.NORTH);
         editorPanel.add(fields,BorderLayout.CENTER);
-        JTextArea note=new JTextArea("先保存草稿，再发布。发布后条款、有效期和总量锁定；要改条款请新建券。\n暂停仅停止后续领取，已领券在有效期内仍可使用。领券/用券共用起止，开始包含、结束不包含。",4,35);
-        note.setLineWrap(true); note.setWrapStyleWord(true); note.setEditable(false); note.setOpaque(false); note.setFont(new JLabel().getFont()); editorPanel.add(note,BorderLayout.SOUTH);
+        editorPanel.add(Ui.row(Ui.help("0元门槛即无门槛。先保存草稿再发布；发布后锁定条款。暂停只停止领取，已领券仍可使用。北京时间开始包含、结束不包含。")),BorderLayout.SOUTH);
         JSplitPane split=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,new JScrollPane(list),editorPanel); split.setResizeWeight(.28); split.setDividerLocation(260); add(split,BorderLayout.CENTER);
         JPanel footer=new JPanel(new BorderLayout(0,8)); status.putClientProperty("html.disable",true); status.setName("coupon-admin-status"); footer.add(status,BorderLayout.NORTH);
-        JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,16,0));
         for(var button:new JButton[]{save,publish,pause})actions.add(button);
-        save.setName("coupon-save"); publish.setName("coupon-publish"); pause.setName("coupon-pause"); footer.add(actions,BorderLayout.SOUTH); add(footer,BorderLayout.SOUTH);
+        save.setName("coupon-save"); publish.setName("coupon-publish");Theme.primary(publish); pause.setName("coupon-pause"); footer.add(actions,BorderLayout.SOUTH); add(footer,BorderLayout.SOUTH);
         list.addListSelectionListener(event -> { if(!filling && !busy && !event.getValueIsAdjusting() && list.getSelectedValue()!=null)showEditor(list.getSelectedValue()); });
         create.addActionListener(event -> newDraft()); reload.addActionListener(event -> load(offset)); previous.addActionListener(event -> load(Math.max(0,offset-20))); next.addActionListener(event -> load(offset+20));
         save.addActionListener(event -> saveDraft()); publish.addActionListener(event -> { if(editor!=null)controller.publish(editor,this::saved); });
@@ -110,14 +108,14 @@ public final class CouponManagementPanel extends JPanel implements AutoCloseable
         } catch(Exception ex){status.setText("输入无效，请核对名称、金额、总量及起止时间（yyyy-MM-dd HH:mm:ss）。");}
     }
     private void changed(){if(!filling){dirty=true;controls();}}
-    private void showStatus(CouponManagementController.Status value){busy=value.busy(); if(value.reloadRequired())needsReload=true;status.setText(value.message());controls();}
+    private void showStatus(CouponManagementController.Status value){busy=value.busy(); if(value.reloadRequired())needsReload=true;status.setText(value.message());status.setVisible(value.busy() || NoticeBar.important(value.message()));controls();}
     private void controls() {
         boolean draft=editor!=null && !editor.published(),edit=!busy && !needsReload && draft;
         for(JComponent field:new JComponent[]{name,threshold,discount,start,end,total,save})field.setEnabled(edit);
-        list.setEnabled(!busy);create.setEnabled(!busy);reload.setEnabled(!busy);previous.setEnabled(!busy && offset>0);next.setEnabled(!busy && hasMore);
+        list.setEnabled(!busy);create.setEnabled(!busy);reload.setEnabled(!busy);previous.setVisible(offset>0);next.setVisible(hasMore);previous.setEnabled(!busy && offset>0);next.setEnabled(!busy && hasMore);
         publish.setEnabled(edit && editor.campaignId()>0 && !dirty);pause.setEnabled(!busy && !needsReload && editor!=null && editor.published());
         pause.setText(editor!=null && editor.paused()?"恢复领取":"暂停领取");
     }
-    private static void field(JPanel panel,String text,JTextField field,String key){field.setName(key);panel.add(new JLabel(text));panel.add(field);}
+    private static void field(JPanel panel,String text,JTextField field,String key){field.setName(key);panel.add(Ui.field(text,field,text.contains("时间")?"yyyy-MM-dd HH:mm:ss（北京时间）":null));}
     @Override public void close(){controller.close();}
 }

@@ -6,7 +6,7 @@ import java.util.*;
 
 public record OrderPage(List<Summary> items,int limit,int offset,boolean hasMore) {
     public record Summary(long orderId,long createdAt,String status,int itemCount,BigInteger paidCents){
-        public Summary {if(orderId<=0 || createdAt<0 || !"COMPLETED".equals(status) || itemCount<1 || itemCount>100 || paidCents==null || paidCents.signum()<0 || paidCents.bitLength()>128)throw new IllegalArgumentException("Invalid order summary.");}
+        public Summary {if(orderId<=0 || createdAt<0 || !OrderSnapshot.validStatus(status) || itemCount<1 || itemCount>100 || paidCents==null || paidCents.signum()<0 || paidCents.bitLength()>128)throw new IllegalArgumentException("Invalid order summary.");}
     }
     public OrderPage {items=List.copyOf(items);if(limit<1 || limit>100 || offset<0 || items.size()>limit || hasMore && items.size()!=limit)throw new IllegalArgumentException("Invalid order page.");
         Long previous=null;for(var item:items){if(previous!=null && item.orderId()>=previous)throw new IllegalArgumentException("Orders must be descending.");previous=item.orderId();}}

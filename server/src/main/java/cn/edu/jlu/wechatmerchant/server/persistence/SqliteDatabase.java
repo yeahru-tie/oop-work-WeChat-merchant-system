@@ -17,7 +17,7 @@ import org.sqlite.SQLiteConfig;
 
 public final class SqliteDatabase {
     public static final int APPLICATION_ID = 0x4D435331;
-    public static final int VERSION = 6;
+    public static final int VERSION = 8;
     private final Path file;
     private final List<Product> seedOverride;
 
@@ -46,12 +46,14 @@ public final class SqliteDatabase {
         }
         try (Connection connection = openWriteConnection()) {
             int originalVersion = pragma(connection, "user_version");
-            if (pragma(connection, "application_id") == APPLICATION_ID && originalVersion >= 1 && originalVersion <= 5) {
+            if (pragma(connection, "application_id") == APPLICATION_ID && originalVersion >= 1 && originalVersion <= 7) {
                 validateProducts(connection);
                 if (originalVersion >= 2) validateUsers(connection);
                 if (originalVersion >= 3) validateCarts(connection);
                 if (originalVersion >= 4) validatePromotions(connection);
                 if (originalVersion >= 5) validateCoupons(connection);
+                if (originalVersion >= 6) validateOrders(connection);
+                if (originalVersion >= 7) validateAfterSales(connection);
                 Path backup = file.resolveSibling(file.getFileName() + ".v" + originalVersion + "-" + UUID.randomUUID() + ".db");
                 try (var statement = connection.prepareStatement("VACUUM INTO ?")) {
                     statement.setString(1, backup.toString());
@@ -72,11 +74,13 @@ public final class SqliteDatabase {
                     initializePromotions(connection);
                     initializeCoupons(connection);
                     initializeOrders(connection);
+                    initializeAfterSales(connection);
+                    initializeNotifications(connection);
                     try (var statement = connection.createStatement()) {
                         statement.execute("PRAGMA application_id=" + APPLICATION_ID);
                         statement.execute("PRAGMA user_version=" + VERSION);
                     }
-                } else if (owner == APPLICATION_ID && version >= 1 && version <= 5) {
+                } else if (owner == APPLICATION_ID && version >= 1 && version <= 7) {
                     validateProducts(connection);
                     if (version == 1) initializeUsers(connection);
                     else validateUsers(connection);
@@ -86,7 +90,11 @@ public final class SqliteDatabase {
                     else validatePromotions(connection);
                     if(version<5)initializeCoupons(connection);
                     else validateCoupons(connection);
-                    initializeOrders(connection);
+                    if(version<6)initializeOrders(connection);
+                    else validateOrders(connection);
+                    if(version<7)initializeAfterSales(connection);
+                    else validateAfterSales(connection);
+                    initializeNotifications(connection);
                     try (var statement = connection.createStatement()) {
                         statement.execute("PRAGMA user_version=" + VERSION);
                     }
@@ -154,11 +162,43 @@ public final class SqliteDatabase {
         validateCarts(connection);
         validatePromotions(connection);
         validateCoupons(connection);
+        validateOrders(connection);
+        validateAfterSales(connection);
+        try(var s=connection.createStatement()){
+            try(var r=s.executeQuery("SELECT message_id,user_id,event_key,kind,title,body,created_at,order_id,product_id FROM notifications LIMIT 0")){}
+            try(var r=s.executeQuery("SELECT message_id,user_id,read_at FROM message_reads LIMIT 0")){}
+        }
+    }
+
+    private static void validateAfterSales(Connection connection) throws SQLException {
+        try(var s=connection.createStatement()){
+            try(var r=s.executeQuery("SELECT after_sale_id,order_id,user_id,return_key,version,status,reason,review_note,applied_at,reviewed_at,completed_at,refund_cents,reviewer_id FROM after_sales LIMIT 0")){}
+            try(var r=s.executeQuery("SELECT user_id,return_key,request_hash,state,after_sale_id,failure_code FROM return_attempts LIMIT 0")){}
+            try(var r=s.executeQuery("SELECT after_sale_id,order_id,amount_cents,completed_at,operator_id FROM refunds LIMIT 0")){}
+            try(var r=s.executeQuery("SELECT 1 FROM sqlite_master WHERE type='index' AND name='one_live_return'")){if(!r.next())throw new SQLException("Missing after-sale constraint.");}
+        }
+    }
+
+    private static void validateOrders(Connection connection) throws SQLException {
         try(var statement=connection.createStatement()) {
             try(var rows=statement.executeQuery("SELECT order_id,user_id,checkout_key,created_at,status,coupon_json,original_cents,product_reduction_cents,coupon_reduction_cents,paid_cents FROM orders LIMIT 0")){}
             try(var rows=statement.executeQuery("SELECT order_id,item_seq,cart_item_id,product_id,name,price_cents,quantity,promotion_json FROM order_items LIMIT 0")){}
             try(var rows=statement.executeQuery("SELECT user_id,checkout_key,request_hash,state,order_id,failure_code FROM checkout_attempts LIMIT 0")){}
             try(var rows=statement.executeQuery("SELECT used_order_id FROM user_coupons LIMIT 0")){}
+        }
+    }
+
+    private static void initializeAfterSales(Connection c) throws SQLException {
+        try(var s=c.createStatement()){
+            s.execute(resource("/db/after-sales-v7.sql"));s.execute(resource("/db/return-attempts-v7.sql"));s.execute(resource("/db/refunds-v7.sql"));
+            s.execute("CREATE UNIQUE INDEX one_live_return ON after_sales(order_id) WHERE status IN ('REQUESTED','APPROVED','COMPLETED')");
+        }
+    }
+
+    private static void initializeNotifications(Connection c) throws SQLException {
+        try(var s=c.createStatement()){
+            s.execute(resource("/db/notifications-v8.sql"));s.execute(resource("/db/message-reads-v8.sql"));
+            s.execute("CREATE INDEX notifications_recipient ON notifications(user_id,message_id DESC)");
         }
     }
 
